@@ -24,60 +24,158 @@ bot = commands.Bot(
 GUILD_ID = 1510681614919794868
 GUILD = discord.Object(id=GUILD_ID)
 
-MARO_FILE = "maro_money.json"
-money_data = {}
+DATA_FILE = "/data/furina_maro_fishing.json"
+os.makedirs("/data", exist_ok=True)
+
+
+class NormalizedDict(dict):
+    """디스코드 ID가 int/string으로 섞여도 같은 키로 처리하는 딕셔너리."""
+    def _key(self, key):
+        return str(key)
+
+    def __contains__(self, key):
+        return super().__contains__(self._key(key))
+
+    def __getitem__(self, key):
+        return super().__getitem__(self._key(key))
+
+    def __setitem__(self, key, value):
+        super().__setitem__(self._key(key), value)
+
+    def get(self, key, default=None):
+        return super().get(self._key(key), default)
+
+    def setdefault(self, key, default=None):
+        return super().setdefault(self._key(key), default)
+
+    def pop(self, key, default=None):
+        return super().pop(self._key(key), default)
+
+
+money_data = NormalizedDict()
+fish_tanks = NormalizedDict()
+fish_dex = NormalizedDict()
+
+owned_rods = NormalizedDict()
+equipped_rods = NormalizedDict()
+owned_baits = NormalizedDict()
+equipped_baits = NormalizedDict()
+
+fish_market = {}
+last_market_update = None
+fishing_cooldowns = {}
+
+
+def _serialize_save(obj):
+    if isinstance(obj, set):
+        return list(obj)
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    raise TypeError(f"{type(obj)} is not JSON serializable")
+
+
+def _restore_datetime(value):
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            return value
+    return value
+
 
 def load_maro():
     global money_data
+    global fish_tanks, fish_dex
+    global owned_rods, equipped_rods, owned_baits, equipped_baits
+    global fish_market, last_market_update, fishing_cooldowns
 
-    if not os.path.exists(MARO_FILE):
-        money_data = {}
+    if not os.path.exists(DATA_FILE):
         save_data()
         return
 
-    with open(MARO_FILE, "r", encoding="utf-8") as f:
-        money_data = json.load(f)
+    with open(DATA_FILE, "r", encoding="utf-8") as f:
+        loaded = json.load(f)
 
-    # json은 키가 문자열이라 디코 ID도 문자열로 통일
-    money_data = {str(k): int(v) for k, v in money_data.items()}
+    money_data = NormalizedDict({
+        str(k): int(v)
+        for k, v in loaded.get("money_data", {}).items()
+    })
+
+    fish_tanks = NormalizedDict(loaded.get("fish_tanks", {}))
+
+    fish_dex = NormalizedDict()
+    for uid, value in loaded.get("fish_dex", {}).items():
+        fish_dex[uid] = set(value) if isinstance(value, list) else set()
+
+    owned_rods = NormalizedDict(loaded.get("owned_rods", {}))
+    equipped_rods = NormalizedDict(loaded.get("equipped_rods", {}))
+    owned_baits = NormalizedDict(loaded.get("owned_baits", {}))
+    equipped_baits = NormalizedDict(loaded.get("equipped_baits", {}))
+
+    fish_market = loaded.get("fish_market", {})
+    last_market_update = _restore_datetime(loaded.get("last_market_update"))
+
+    fishing_cooldowns = {}
+    for uid, value in loaded.get("fishing_cooldowns", {}).items():
+        fishing_cooldowns[str(uid)] = _restore_datetime(value)
 
 
 def save_data():
-    with open(MARO_FILE, "w", encoding="utf-8") as f:
-        json.dump(money_data, f, ensure_ascii=False, indent=4)
+    payload = {
+        "money_data": dict(globals().get("money_data", {})),
+        "fish_tanks": dict(globals().get("fish_tanks", {})),
+        "fish_dex": dict(globals().get("fish_dex", {})),
+        "owned_rods": dict(globals().get("owned_rods", {})),
+        "equipped_rods": dict(globals().get("equipped_rods", {})),
+        "owned_baits": dict(globals().get("owned_baits", {})),
+        "equipped_baits": dict(globals().get("equipped_baits", {})),
+        "fish_market": globals().get("fish_market", {}),
+        "last_market_update": globals().get("last_market_update", None),
+        "fishing_cooldowns": globals().get("fishing_cooldowns", {}),
+    }
+
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=4, default=_serialize_save)
 
 
 def get_wallet(user_id):
-    user_id = str(user_id)
+    uid = str(user_id)
 
-    if user_id not in money_data:
-        money_data[user_id] = 0
+    if uid not in money_data:
+        money_data[uid] = 0
         save_data()
 
-    return money_data[user_id]
+    return money_data[uid]
 
 
 def add_maro(user_id, amount):
-    user_id = str(user_id)
-    get_wallet(user_id)
-    money_data[user_id] += int(amount)
+    uid = str(user_id)
+    get_wallet(uid)
+    money_data[uid] += int(amount)
     save_data()
 
 
 def remove_maro(user_id, amount):
-    user_id = str(user_id)
-    get_wallet(user_id)
+    uid = str(user_id)
+    get_wallet(uid)
 
-    if money_data[user_id] < amount:
+    if money_data[uid] < amount:
         return False
 
-    money_data[user_id] -= int(amount)
+    money_data[uid] -= int(amount)
     save_data()
     return True
 
 
 def money(amount):
     return f"{int(amount):,} 마로"
+
+
+def get_item_display_name(item, fallback="알 수 없음"):
+    if not isinstance(item, dict):
+        return fallback
+    return item.get("display_name") or item.get("name") or fallback
+
 
 load_maro()
 
@@ -1864,7 +1962,7 @@ async def fishing_success(interaction: discord.Interaction):
     rod = ROD_DATA.get(rod_name, ROD_DATA["기본 낚싯대"])
     bait = BAIT_DATA.get(bait_name, BAIT_DATA["미끼 없음"])
 
-    luck_bonus = rod["luck"] + bait["luck"] + get_pendant_luck(user_id)
+    luck_bonus = rod["luck"] + bait["luck"]
 
     def use_bait():
         if bait_name != "미끼 없음":
