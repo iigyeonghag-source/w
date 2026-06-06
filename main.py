@@ -21,6 +21,9 @@ bot = commands.Bot(
     intents=intents
 )
 
+GUILD_ID = 1510681614919794868
+GUILD = discord.Object(id=GUILD_ID)
+
 MARO_FILE = "maro_money.json"
 money_data = {}
 
