@@ -934,67 +934,67 @@ FISH_TRAITS = {
 
 ROD_DATA = {
     "기본 낚싯대": {
-        "price": 0, "ores": {},
+        "price": 0,
         "luck": 0, "time_reduce": 0,
         "double_chance": 0, "triple_chance": 0,
         "gauge_bonus": 0
     },
     "초급 낚싯대": {
-        "price": 150000, "ores": {"돌": 10, "구리": 7},
+        "price": 150000,
         "luck": 5, "time_reduce": 5,
         "double_chance": 2, "triple_chance": 0.1,
         "gauge_bonus": 3
     },
     "중급 낚싯대": {
-        "price": 600000, "ores": {"구리": 10, "철광석": 10},
+        "price": 600000,
         "luck": 12, "time_reduce": 12,
         "double_chance": 5, "triple_chance": 1,
         "gauge_bonus": 5
     },
     "고급 낚싯대": {
-        "price": 1300000, "ores": {"철광석": 40, "은광석": 15},
+        "price": 1300000,
         "luck": 23, "time_reduce": 25,
         "double_chance": 8, "triple_chance": 2,
         "gauge_bonus": 10
     },
     "개쩌는 낚싯대": {
-        "price": 3000000, "ores": {"금광석": 25, "다이아몬드": 5},
+        "price": 3000000,
         "luck": 37, "time_reduce": 25,
         "double_chance": 10, "triple_chance": 5,
         "gauge_bonus": 15
     },
     "최상의 낚싯대": {
-        "price": 8000000, "ores": {"사파이어": 7, "다이아몬드": 5, "에메랄드": 3},
+        "price": 8000000,
         "luck": 55, "time_reduce": 30,
         "double_chance": 15, "triple_chance": 7,
         "gauge_bonus": 18
     },
     "장인의 낚싯대": {
-        "price": 20000000, "ores": {"네더라이트": 2, "다이아몬드": 5, "철광석": 20},
+        "price": 20000000,
         "luck": 75, "time_reduce": 40,
         "double_chance": 18, "triple_chance": 10,
         "gauge_bonus": 22
     },
     "엘프의 낚싯대": {
-        "price": 60000000, "ores": {"레인보우 다이아몬드": 1, "네더라이트": 3, "에메랄드": 2},
+        "price": 60000000,
         "luck": 100, "time_reduce": 45,
         "double_chance": 20, "triple_chance": 12,
         "gauge_bonus": 25
     },
     "강태공의 낚싯대": {
-        "price": 180000000, "ores": {"레인보우 다이아몬드": 3, "레드 다이아몬드": 5, "네더라이트": 3},
+        "price": 180000000,
         "luck": 235, "time_reduce": 55,
         "double_chance": 35, "triple_chance": 15,
         "gauge_bonus": 30
     },
     "신의 낚싯대": {
-        "price": 500000000, "ores": {"신기루": 3, "레인보우 다이아몬드": 10, "우라늄": 1, "레드 다이아몬드": 3},
+        "price": 500000000,
         "luck": 450, "time_reduce": 60,
         "double_chance": 40, "triple_chance": 30,
         "gauge_bonus": 40
     },
     "도로롱의 낚싯대": {
-        "price": 800000000, "ores": {"신기루": 30},
+        "price": 800000000,
         "luck": 900, "time_reduce": 70,
         "double_chance": 25, "triple_chance": 75,
         "gauge_bonus": 55
