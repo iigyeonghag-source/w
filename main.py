@@ -1,5 +1,10 @@
 import json
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+TOKEN = os.getenv("TOKEN")
 
 MARO_FILE = "maro_money.json"
 money_data = {}
@@ -58,32 +63,6 @@ def money(amount):
 
 load_maro()
 
-@bot.tree.command(name="잔액", description="내 마로 잔액 확인", guild=GUILD)
-async def check_maro(interaction: discord.Interaction):
-    user_id = str(interaction.user.id)
-    get_wallet(user_id)
-
-    await interaction.response.send_message(
-        f"💰 {interaction.user.mention}의 잔액: **{money(money_data[user_id])}**"
-    )
-
-@bot.tree.command(name="마로지급", description="유저에게 마로를 지급한다", guild=GUILD)
-@app_commands.checks.has_permissions(administrator=True)
-async def give_maro(
-    interaction: discord.Interaction,
-    유저: discord.Member,
-    금액: int
-):
-    if 금액 <= 0:
-        await interaction.response.send_message("❌ 1 마로 이상 지급해야 함.", ephemeral=True)
-        return
-
-    add_maro(유저.id, 금액)
-
-    await interaction.response.send_message(
-        f"✅ {유저.mention}에게 **{money(금액)}** 지급 완료!\n"
-        f"현재 잔액: **{money(money_data[str(유저.id)])}**"
-    )
 # =========================
 # 낚시 시스템
 # =========================
@@ -2573,6 +2552,33 @@ class LostItemReturnView(discord.ui.View):
 
         self.stop()
 
+@bot.tree.command(name="잔액", description="내 마로 잔액 확인", guild=GUILD)
+async def check_maro(interaction: discord.Interaction):
+    user_id = str(interaction.user.id)
+    get_wallet(user_id)
+
+    await interaction.response.send_message(
+        f"💰 {interaction.user.mention}의 잔액: **{money(money_data[user_id])}**"
+    )
+
+@bot.tree.command(name="마로지급", description="유저에게 마로를 지급한다", guild=GUILD)
+@app_commands.checks.has_permissions(administrator=True)
+async def give_maro(
+    interaction: discord.Interaction,
+    유저: discord.Member,
+    금액: int
+):
+    if 금액 <= 0:
+        await interaction.response.send_message("❌ 1 마로 이상 지급해야 함.", ephemeral=True)
+        return
+
+    add_maro(유저.id, 금액)
+
+    await interaction.response.send_message(
+        f"✅ {유저.mention}에게 **{money(금액)}** 지급 완료!\n"
+        f"현재 잔액: **{money(money_data[str(유저.id)])}**"
+    )
+    
 @bot.tree.command(name="어시장리셋", description="어시장 시세를 초기화한다", guild=GUILD)
 @app_commands.checks.has_permissions(administrator=True)
 async def reset_fish_market(interaction: discord.Interaction):
@@ -2608,3 +2614,5 @@ async def reset_fish_market_error(
             "❌ 관리자만 사용 가능.",
             ephemeral=True
         )
+
+bot.run(TOKEN)
