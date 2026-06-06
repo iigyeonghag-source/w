@@ -2633,4 +2633,9 @@ async def reset_fish_market_error(
             ephemeral=True
         )
 
+@bot.event
+async def on_ready():
+    await bot.tree.sync(guild=GUILD)
+    print(f"{bot.user} 로그인 완료")
+    
 bot.run(TOKEN)
