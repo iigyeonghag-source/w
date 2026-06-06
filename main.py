@@ -13,6 +13,14 @@ load_dotenv()
 
 TOKEN = os.getenv("TOKEN")
 
+intents = discord.Intents.default()
+intents.message_content = True
+
+bot = commands.Bot(
+    command_prefix="!",
+    intents=intents
+)
+
 MARO_FILE = "maro_money.json"
 money_data = {}
 
