@@ -168,7 +168,7 @@ def remove_maro(user_id, amount):
 
 
 def money(amount):
-    return f"{int(amount):,} 마로"
+    return f"{int(amount):,}"
 
 
 def get_item_display_name(item, fallback="알 수 없음"):
@@ -2668,7 +2668,7 @@ class LostItemReturnView(discord.ui.View):
 
         self.stop()
 
-@bot.tree.command(name="잔액", description="내 마로 잔액 확인", guild=GUILD)
+@bot.tree.command(name="잔액", description="내 잔액 확인", guild=GUILD)
 async def check_maro(interaction: discord.Interaction):
     user_id = str(interaction.user.id)
     get_wallet(user_id)
@@ -2677,7 +2677,7 @@ async def check_maro(interaction: discord.Interaction):
         f"💰 {interaction.user.mention}의 잔액: **{money(money_data[user_id])}**"
     )
 
-@bot.tree.command(name="마로지급", description="유저에게 마로를 지급한다", guild=GUILD)
+@bot.tree.command(name="돈지급", description="유저에게 돈을 지급한다", guild=GUILD)
 @app_commands.checks.has_permissions(administrator=True)
 async def give_maro(
     interaction: discord.Interaction,
@@ -2685,7 +2685,7 @@ async def give_maro(
     금액: int
 ):
     if 금액 <= 0:
-        await interaction.response.send_message("❌ 1 마로 이상 지급해야 함.", ephemeral=True)
+        await interaction.response.send_message("❌ 1원 이상 지급해야 함.", ephemeral=True)
         return
 
     add_maro(유저.id, 금액)
