@@ -1521,7 +1521,7 @@ class FishBattleView(discord.ui.View):
         self.need_hits = random.randint(1, 3)
 
         self.target_index = None
-        self.trap_index = None
+        self.trap_indices = []
         self.gold_index = None
         self.round_active = False
         self.round_token = 0
@@ -1597,15 +1597,82 @@ class FishBattleView(discord.ui.View):
             item.disabled = disabled
 
     async def start_battle(self):
-        await self.wait_for_chance()
+        await self.start_hit_round()
 
     async def wait_for_chance(self):
-        self.round_active = False
+        # 대기 구간 제거: 초록 버튼이 계속 뜨는 방식으로 즉시 다음 라운드 시작.
+        await self.start_hit_round()
+
+    def setup_round_buttons(self):
+        previous_target = self.target_index
+        self.target_index = random.randint(0, 4)
+        self.trap_indices = []
+        self.gold_index = None
+
+        if self.force_move_next and previous_target is not None:
+            possible = [i for i in range(5) if i != previous_target]
+            self.target_index = random.choice(possible)
+            self.force_move_next = False
+
+        # 빨간 함정 칸은 한 번에 0~3개까지 등장할 수 있음.
+        # 특수 메시지가 터졌으면 최소 1개는 보장.
+        possible_traps = [i for i in range(5) if i != self.target_index]
+
+        if self.force_trap_next:
+            trap_count = random.randint(1, min(3, len(possible_traps)))
+            self.force_trap_next = False
+        else:
+            trap_count = random.choices(
+                [0, 1, 2, 3],
+                weights=[55, 25, 15, 5],
+                k=1
+            )[0]
+            trap_count = min(trap_count, len(possible_traps))
+
+        self.trap_indices = random.sample(possible_traps, trap_count) if trap_count > 0 else []
+
+        # 가끔 초록 버튼과 황금 버튼이 같이 나옴.
+        # 황금 버튼은 남은 타이밍 수를 무시하고 게이지를 원래 증가량의 2배로 채움.
+        if random.randint(1, 100) <= 15:
+            possible = [
+                i for i in range(5)
+                if i != self.target_index and i not in self.trap_indices
+            ]
+            if possible:
+                self.gold_index = random.choice(possible)
+
+        # 검은 박스는 아예 비활성화해서 상호작용이 안 되게 둠.
         self.reset_buttons(disabled=True)
 
-        wait_time = random.randint(2, 6)
+        self.children[self.target_index].label = "🟩"
+        self.children[self.target_index].style = discord.ButtonStyle.green
+        self.children[self.target_index].disabled = False
 
-        for _ in range(wait_time):
+        for trap_index in self.trap_indices:
+            self.children[trap_index].label = "🟥"
+            self.children[trap_index].style = discord.ButtonStyle.red
+            self.children[trap_index].disabled = False
+
+        if self.gold_index is not None:
+            self.children[self.gold_index].label = "🟨"
+            self.children[self.gold_index].style = discord.ButtonStyle.blurple
+            self.children[self.gold_index].disabled = False
+
+    async def start_hit_round(self):
+        self.round_active = True
+        self.round_token += 1
+        token = self.round_token
+
+        # 초록 버튼은 기다리지 않고 계속 뜨며, 5초 안에 눌러야 함.
+        # 라운드가 살아있는 동안 2초마다 초록 버튼 위치와 판이 다시 바뀜.
+        total_time = 5
+        move_interval = 2
+        elapsed = 0
+
+        while elapsed < total_time:
+            if not self.round_active or token != self.round_token:
+                return
+
             if self.gauge >= self.max_gauge:
                 await self.success()
                 return
@@ -1614,77 +1681,32 @@ class FishBattleView(discord.ui.View):
             self.last_event_text = message
             self.apply_battle_message_effect(message)
 
+            if self.gauge >= self.max_gauge:
+                await self.success()
+                return
+
+            self.setup_round_buttons()
+
             effect_text = f"\n{self.last_event_effect}" if self.last_event_effect else ""
+            gold_text = "\n🟨 황금 칸: 누르면 남은 타이밍 무시 + 게이지 2배 증가!" if self.gold_index is not None else ""
+            remaining = total_time - elapsed
 
             await self.message.edit(
                 content=(
-                    f"🎣 **물고기와 힘겨루기 중...**\n\n"
+                    f"🎣 **지금이다!**\n\n"
                     f"{message}{effect_text}\n\n"
+                    f"**{remaining}초 안에** 초록 칸을 누르자!{gold_text}\n"
+                    f"초록 칸 위치는 **2초마다 변경**됨.\n"
                     f"게이지: {make_gauge_bar(self.gauge, self.max_gauge)}\n"
+                    f"이번 타이밍: **{self.hit_count}/{self.need_hits}**\n"
                     f"실수: **{self.fail_count}/3**"
                 ),
                 view=self
             )
-            await asyncio.sleep(1)
 
-        await self.start_hit_round()
-
-    async def start_hit_round(self):
-        self.round_active = True
-        self.round_token += 1
-        token = self.round_token
-
-        self.target_index = random.randint(0, 4)
-        self.trap_index = None
-        self.gold_index = None
-
-        if self.force_move_next:
-            possible = [i for i in range(5) if i != self.target_index]
-            self.target_index = random.choice(possible)
-            self.force_move_next = False
-
-        if self.force_trap_next or random.randint(1, 100) <= 25:
-            possible = [i for i in range(5) if i != self.target_index]
-            self.trap_index = random.choice(possible)
-            self.force_trap_next = False
-
-        # 가끔 초록 버튼과 황금 버튼이 같이 나옴.
-        # 황금 버튼은 남은 타이밍 수를 무시하고 게이지를 원래 증가량의 2배로 채움.
-        if random.randint(1, 100) <= 15:
-            possible = [
-                i for i in range(5)
-                if i != self.target_index and i != self.trap_index
-            ]
-            if possible:
-                self.gold_index = random.choice(possible)
-
-        self.reset_buttons(disabled=False)
-
-        self.children[self.target_index].label = "🟩"
-        self.children[self.target_index].style = discord.ButtonStyle.green
-
-        if self.trap_index is not None:
-            self.children[self.trap_index].label = "🟥"
-            self.children[self.trap_index].style = discord.ButtonStyle.red
-
-        if self.gold_index is not None:
-            self.children[self.gold_index].label = "🟨"
-            self.children[self.gold_index].style = discord.ButtonStyle.blurple
-
-        gold_text = "\n🟨 황금 칸: 누르면 남은 타이밍 무시 + 게이지 2배 증가!" if self.gold_index is not None else ""
-
-        await self.message.edit(
-            content=(
-                f"🎣 **지금이다!**\n\n"
-                f"3초 안에 초록 칸을 누르자!{gold_text}\n"
-                f"게이지: {make_gauge_bar(self.gauge, self.max_gauge)}\n"
-                f"이번 타이밍: **{self.hit_count}/{self.need_hits}**\n"
-                f"실수: **{self.fail_count}/3**"
-            ),
-            view=self
-        )
-
-        await asyncio.sleep(3)
+            sleep_time = min(move_interval, total_time - elapsed)
+            await asyncio.sleep(sleep_time)
+            elapsed += sleep_time
 
         if self.round_active and token == self.round_token:
             self.fail_count += 1
@@ -1699,13 +1721,13 @@ class FishBattleView(discord.ui.View):
                 content=(
                     f"⏱️ 너무 늦었다!\n"
                     f"실수: **{self.fail_count}/3**\n\n"
-                    f"다시 타이밍을 기다리자..."
+                    f"바로 다음 타이밍으로 넘어간다!"
                 ),
                 view=self
             )
 
-            await asyncio.sleep(1)
-            await self.wait_for_chance()
+            await asyncio.sleep(0.5)
+            await self.start_hit_round()
 
     async def add_gauge(self, multiplier=1):
         rod = ROD_DATA.get(self.rod_name, ROD_DATA["기본 낚싯대"])
@@ -1734,8 +1756,8 @@ class FishBattleView(discord.ui.View):
             view=self
         )
 
-        await asyncio.sleep(1)
-        await self.wait_for_chance()
+        await asyncio.sleep(0.5)
+        await self.start_hit_round()
 
     async def success(self):
         caught_text = []
@@ -1829,7 +1851,7 @@ class FishGaugeButton(discord.ui.Button):
             await interaction.response.send_message("❌ 이미 지나간 타이밍이다.", ephemeral=True)
             return
 
-        if self.index == view.trap_index:
+        if self.index in view.trap_indices:
             view.fail_count += 1
             view.round_active = False
             view.round_token += 1
@@ -1850,8 +1872,8 @@ class FishGaugeButton(discord.ui.Button):
                 view=view
             )
 
-            await asyncio.sleep(1)
-            await view.wait_for_chance()
+            await asyncio.sleep(0.5)
+            await view.start_hit_round()
             return
 
         if self.index == view.gold_index:
@@ -1865,7 +1887,9 @@ class FishGaugeButton(discord.ui.Button):
             return
 
         if self.index != view.target_index:
-            await interaction.response.send_message("⬛ 빈 칸이다.", ephemeral=True)
+            # 검은 칸은 disabled=True라 보통 여기까지 못 오지만,
+            # 혹시 UI 상태가 꼬였을 때도 아무 변화 없이 응답만 처리.
+            await interaction.response.defer()
             return
 
         view.round_active = False
