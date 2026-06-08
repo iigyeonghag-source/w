@@ -3091,7 +3091,7 @@ class LostItemReturnView(discord.ui.View):
 
         self.stop()
 
-@bot.tree.command(name="잔액", description="내 잔액 확인", guild=GUILD)
+@bot.tree.command(name="지갑", description="내 잔액 확인", guild=GUILD)
 async def check_maro(interaction: discord.Interaction):
     user_id = str(interaction.user.id)
     get_wallet(user_id)
