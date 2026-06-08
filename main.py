@@ -2637,9 +2637,9 @@ GACHA_COUNT_CHOICES = [
 async def chest_autocomplete(interaction: discord.Interaction, current: str):
     try:
         user_id = interaction.user.id
-        get_item_bags(user_id)
+        get_item_bag(user_id)
 
-        bag = item_bags.get(user_id, {})
+        bag = item_bag.get(user_id, {})
 
         choices = []
 
