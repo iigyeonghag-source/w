@@ -3068,7 +3068,7 @@ class FishDexView(discord.ui.View):
             f"등록: **{len(dex)}/{len(self.fish_names)}종**\n"
             f"페이지: **< {self.page + 1}/{self.max_page} >**\n\n"
             + "\n".join(lines)
-            + "\n\n아래 물고기 버튼을 누르면 위키처럼 자세한 정보가 뜸."
+            + "\n\n아래 버튼을 누르면 자세한 정보가 뜸."
         )
 
 
