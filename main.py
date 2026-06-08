@@ -1104,25 +1104,43 @@ CHEST_DROP_TABLE = {
 }
 
 
-GACHA_PRICE = 100000
+GACHA_PRICE = 50000
+HIGH_GACHA_PRICE = 250000
+
 GACHA_CHEST_TABLE = [
     ("낡은 부품 상자", 78),
     ("신비한 부품 상자", 20),
     ("심해의 보물 상자", 2),
 ]
 
+HIGH_GACHA_CHEST_TABLE = [
+    ("낡은 부품 상자", 35),
+    ("신비한 부품 상자", 50),
+    ("심해의 보물 상자", 15),
+]
 
-def roll_gacha_chest():
-    names = [name for name, weight in GACHA_CHEST_TABLE]
-    weights = [weight for name, weight in GACHA_CHEST_TABLE]
+
+def roll_chest_from_table(table):
+    names = [name for name, weight in table]
+    weights = [weight for name, weight in table]
     return random.choices(names, weights=weights, k=1)[0]
 
 
-def gacha_rate_text():
-    total = sum(weight for name, weight in GACHA_CHEST_TABLE)
+def roll_gacha_chest():
+    return roll_chest_from_table(GACHA_CHEST_TABLE)
+
+
+def roll_high_gacha_chest():
+    return roll_chest_from_table(HIGH_GACHA_CHEST_TABLE)
+
+
+def gacha_rate_text(table=None):
+    if table is None:
+        table = GACHA_CHEST_TABLE
+    total = sum(weight for name, weight in table)
     return "\n".join(
         f"{name}: **{weight / total * 100:.2f}%**"
-        for name, weight in GACHA_CHEST_TABLE
+        for name, weight in table
     )
 
 
@@ -3344,6 +3362,59 @@ async def item_gacha(
 
     if pity_hit > 0:
         msg += f"\n\n🔥 천장 발동 횟수: **{pity_hit}회**"
+
+    await interaction.response.send_message(msg)
+
+
+
+@bot.tree.command(name="고급뽑기", description="비싼 대신 좋은 상자 확률이 높은 제작 재료 상자 뽑기", guild=GUILD)
+@app_commands.describe(횟수="고급 뽑기 횟수")
+@app_commands.choices(횟수=GACHA_COUNT_CHOICES)
+async def high_item_gacha(
+    interaction: discord.Interaction,
+    횟수: int = 1
+):
+    user_id = interaction.user.id
+
+    get_wallet(user_id)
+    get_item_bag(user_id)
+
+    total_price = HIGH_GACHA_PRICE * 횟수
+
+    if money_data[user_id] < total_price:
+        await interaction.response.send_message(
+            f"❌ 돈 부족.\n"
+            f"필요 금액: **{money(total_price)}**\n"
+            f"현재 잔액: **{money(money_data[user_id])}**",
+            ephemeral=True
+        )
+        return
+
+    money_data[user_id] -= total_price
+
+    results = {}
+
+    for _ in range(횟수):
+        chest_name = roll_high_gacha_chest()
+        add_item(user_id, chest_name, 1)
+        results[chest_name] = results.get(chest_name, 0) + 1
+
+    save_data()
+
+    result_text = "\n".join(
+        f"📦 **{name}** x{count}"
+        for name, count in sorted(results.items())
+    )
+
+    msg = (
+        f"💎 **고급 아이템 뽑기 완료!**\n\n"
+        f"횟수: **{횟수}회**\n"
+        f"사용 금액: **{money(total_price)}**\n"
+        f"천장: **없음**\n\n"
+        f"획득:\n{result_text}\n\n"
+        f"💰 현재 잔액: **{money(money_data[user_id])}**\n\n"
+        f"상자는 `/상자열기` 로 열 수 있음."
+    )
 
     await interaction.response.send_message(msg)
 
