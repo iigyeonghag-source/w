@@ -55,6 +55,8 @@ class NormalizedDict(dict):
 money_data = NormalizedDict()
 fish_tanks = NormalizedDict()
 fish_dex = NormalizedDict()
+item_bags = NormalizedDict()
+chest_pity = NormalizedDict()
 
 owned_rods = NormalizedDict()
 equipped_rods = NormalizedDict()
@@ -85,7 +87,7 @@ def _restore_datetime(value):
 
 def load_maro():
     global money_data
-    global fish_tanks, fish_dex
+    global fish_tanks, fish_dex, item_bags, chest_pity
     global owned_rods, equipped_rods, owned_baits, equipped_baits
     global fish_market, last_market_update, fishing_cooldowns
 
@@ -107,6 +109,12 @@ def load_maro():
     for uid, value in loaded.get("fish_dex", {}).items():
         fish_dex[uid] = set(value) if isinstance(value, list) else set()
 
+    item_bags = NormalizedDict(loaded.get("item_bags", {}))
+    chest_pity = NormalizedDict({
+        str(k): int(v)
+        for k, v in loaded.get("chest_pity", {}).items()
+    })
+
     owned_rods = NormalizedDict(loaded.get("owned_rods", {}))
     equipped_rods = NormalizedDict(loaded.get("equipped_rods", {}))
     owned_baits = NormalizedDict(loaded.get("owned_baits", {}))
@@ -125,6 +133,8 @@ def save_data():
         "money_data": dict(globals().get("money_data", {})),
         "fish_tanks": dict(globals().get("fish_tanks", {})),
         "fish_dex": dict(globals().get("fish_dex", {})),
+        "item_bags": dict(globals().get("item_bags", {})),
+        "chest_pity": dict(globals().get("chest_pity", {})),
         "owned_rods": dict(globals().get("owned_rods", {})),
         "equipped_rods": dict(globals().get("equipped_rods", {})),
         "owned_baits": dict(globals().get("owned_baits", {})),
@@ -1048,6 +1058,137 @@ BAIT_DATA = {
     }
 }
 
+
+# =========================
+# 제작 재료 / 상자 아이템 시스템
+# =========================
+
+ITEM_DATA = {
+    "낡은 부품 상자": {"type": "chest", "price": 25000, "grade": "일반"},
+    "신비한 부품 상자": {"type": "chest", "price": 150000, "grade": "희귀"},
+    "심해의 보물 상자": {"type": "chest", "price": 900000, "grade": "전설"},
+
+    "낡은 릴": {"type": "material", "price": 8000, "grade": "일반"},
+    "질긴 낚싯줄": {"type": "material", "price": 9000, "grade": "일반"},
+    "강철 바늘": {"type": "material", "price": 18000, "grade": "일반"},
+    "튼튼한 손잡이": {"type": "material", "price": 22000, "grade": "일반"},
+    "방수 접착제": {"type": "material", "price": 30000, "grade": "일반"},
+    "반짝이는 비늘": {"type": "material", "price": 75000, "grade": "희귀"},
+    "마력 깃든 나무": {"type": "material", "price": 120000, "grade": "희귀"},
+    "정교한 릴": {"type": "material", "price": 180000, "grade": "희귀"},
+    "심해의 수정": {"type": "material", "price": 500000, "grade": "영웅"},
+    "고대 물고기 비늘": {"type": "material", "price": 900000, "grade": "영웅"},
+    "엘프의 실": {"type": "material", "price": 1600000, "grade": "전설"},
+    "신성한 파편": {"type": "material", "price": 5000000, "grade": "전설"},
+}
+
+CHEST_DROP_TABLE = {
+    "낡은 부품 상자": [
+        ("낡은 릴", 24), ("질긴 낚싯줄", 24), ("강철 바늘", 20),
+        ("튼튼한 손잡이", 16), ("방수 접착제", 10), ("반짝이는 비늘", 6),
+    ],
+    "신비한 부품 상자": [
+        ("방수 접착제", 20), ("반짝이는 비늘", 25), ("마력 깃든 나무", 22),
+        ("정교한 릴", 18), ("심해의 수정", 10), ("고대 물고기 비늘", 5),
+    ],
+    "심해의 보물 상자": [
+        ("심해의 수정", 24), ("고대 물고기 비늘", 24), ("엘프의 실", 15),
+        ("신성한 파편", 7), ("정교한 릴", 15), ("마력 깃든 나무", 15),
+    ],
+}
+
+ROD_CRAFT_COSTS = {
+    "초급 낚싯대": {"낡은 릴": 1, "질긴 낚싯줄": 2},
+    "중급 낚싯대": {"낡은 릴": 2, "질긴 낚싯줄": 4, "강철 바늘": 2},
+    "고급 낚싯대": {"강철 바늘": 4, "튼튼한 손잡이": 3, "방수 접착제": 2},
+    "개쩌는 낚싯대": {"반짝이는 비늘": 4, "마력 깃든 나무": 2, "정교한 릴": 1},
+    "최상의 낚싯대": {"마력 깃든 나무": 5, "정교한 릴": 3, "심해의 수정": 1},
+    "장인의 낚싯대": {"정교한 릴": 5, "심해의 수정": 3, "고대 물고기 비늘": 1},
+    "엘프의 낚싯대": {"엘프의 실": 2, "마력 깃든 나무": 10, "고대 물고기 비늘": 3},
+    "강태공의 낚싯대": {"엘프의 실": 4, "심해의 수정": 8, "고대 물고기 비늘": 6},
+    "신의 낚싯대": {"신성한 파편": 2, "엘프의 실": 8, "고대 물고기 비늘": 10},
+    "도로롱의 낚싯대": {"신성한 파편": 5, "엘프의 실": 12, "심해의 수정": 20},
+}
+
+for _rod_name, _costs in ROD_CRAFT_COSTS.items():
+    if _rod_name in ROD_DATA:
+        ROD_DATA[_rod_name]["items"] = _costs
+
+
+def get_item_bag(user_id):
+    uid = str(user_id)
+    if uid not in item_bags or not isinstance(item_bags[uid], dict):
+        item_bags[uid] = {}
+        save_data()
+    return item_bags[uid]
+
+
+def get_item_count(user_id, item_name):
+    return int(get_item_bag(user_id).get(item_name, 0))
+
+
+def add_item(user_id, item_name, count=1):
+    if item_name not in ITEM_DATA:
+        return False
+    bag = get_item_bag(user_id)
+    bag[item_name] = int(bag.get(item_name, 0)) + int(count)
+    save_data()
+    return True
+
+
+def remove_item(user_id, item_name, count=1):
+    bag = get_item_bag(user_id)
+    if int(bag.get(item_name, 0)) < count:
+        return False
+    bag[item_name] -= int(count)
+    if bag[item_name] <= 0:
+        del bag[item_name]
+    save_data()
+    return True
+
+
+def weighted_item_choice(drop_table):
+    names = [name for name, weight in drop_table]
+    weights = [weight for name, weight in drop_table]
+    return random.choices(names, weights=weights, k=1)[0]
+
+
+def open_chest_once(user_id, chest_name):
+    if chest_name not in CHEST_DROP_TABLE:
+        return None
+    if not remove_item(user_id, chest_name, 1):
+        return None
+    item_name = weighted_item_choice(CHEST_DROP_TABLE[chest_name])
+    add_item(user_id, item_name, 1)
+    return item_name
+
+
+def roll_fishing_chest(user_id):
+    """낚시 성공 보상용 상자 드랍. 실패가 쌓이면 확률이 조금씩 오른다."""
+    uid = str(user_id)
+    pity = int(chest_pity.get(uid, 0))
+    chance = min(35, 8 + pity * 2)
+
+    if random.randint(1, 100) > chance:
+        chest_pity[uid] = pity + 1
+        save_data()
+        return None
+
+    chest_pity[uid] = 0
+    chest_name = random.choices(
+        ["낡은 부품 상자", "신비한 부품 상자", "심해의 보물 상자"],
+        weights=[75, 22, 3],
+        k=1
+    )[0]
+    add_item(user_id, chest_name, 1)
+    return chest_name
+
+
+def item_cost_text(costs):
+    if not costs:
+        return "없음"
+    return ", ".join(f"{name} x{count}" for name, count in costs.items())
+
 BOSS_FISH = ["메갈로돈", "크라켄"]
 
 # FISH_DATA chance는 한 번만 절반으로 줄어들게 처리
@@ -1069,6 +1210,8 @@ if not globals().get("_FISH_CHANCE_HALVED", False):
 
 fish_tanks = globals().get("fish_tanks", {})
 fish_dex = globals().get("fish_dex", {})
+item_bags = globals().get("item_bags", {})
+chest_pity = globals().get("chest_pity", {})
 
 owned_rods = globals().get("owned_rods", {})
 equipped_rods = globals().get("equipped_rods", {})
@@ -1780,6 +1923,9 @@ class FishBattleView(discord.ui.View):
                 f"{trait_text}"
             )
 
+        chest_name = roll_fishing_chest(self.user_id)
+        chest_text = f"\n\n📦 추가 보상: **{chest_name}** 획득! `/상자열기 {chest_name}`로 열 수 있음." if chest_name else ""
+
         save_data()
 
         lost_rewards = globals().get("LOST_ITEM_REWARDS", {})
@@ -1988,6 +2134,8 @@ class BossFishingView(discord.ui.View):
 
     async def success_boss(self):
         fish = make_fish(self.user_id, self.boss_name)
+        chest_name = roll_fishing_chest(self.user_id)
+        chest_text = f"\n\n📦 추가 보상: **{chest_name}** 획득! `/상자열기 {chest_name}`로 열 수 있음." if chest_name else ""
         save_data()
 
         for item in self.children:
@@ -2008,6 +2156,7 @@ class BossFishingView(discord.ui.View):
                 f"{trait_text}\n\n"
                 f"사용 낚싯대: **{self.rod_name}**\n"
                 f"사용 미끼: **{self.bait_name}**"
+                f"{chest_text}"
             ),
             view=None
         )
@@ -2405,6 +2554,167 @@ async def sell_all_fish(interaction: discord.Interaction):
     )
 
 
+
+@bot.tree.command(name="아이템", description="보유한 제작 재료와 상자를 확인한다", guild=GUILD)
+async def my_items(interaction: discord.Interaction):
+    user_id = interaction.user.id
+    get_item_bag(user_id)
+
+    bag = item_bags[str(user_id)]
+
+    if not bag:
+        await interaction.response.send_message("🎒 아이템 가방이 비어있다.")
+        return
+
+    lines = []
+    total_value = 0
+
+    for name, count in sorted(bag.items()):
+        data = ITEM_DATA.get(name, {"price": 0, "grade": "알 수 없음", "type": "unknown"})
+        price = int(data.get("price", 0)) * int(count)
+        total_value += price
+        type_text = "상자" if data.get("type") == "chest" else "재료"
+        lines.append(
+            f"📦 **{name}** x{count} / {type_text} / {data.get('grade', '알 수 없음')} / 판매가 {money(price)}원"
+        )
+
+    content = (
+        f"🎒 **내 아이템** | 종류 {len(bag)}개 / 예상가 {money(total_value)}원\n\n"
+        + "\n".join(lines)
+    )
+
+    if len(content) <= 2000:
+        await interaction.response.send_message(content)
+        return
+
+    file = discord.File(BytesIO(content.encode("utf-8")), filename=f"items_{user_id}.txt")
+    await interaction.response.send_message("📄 아이템 목록이 길어서 txt 파일로 뽑았음.", file=file)
+
+
+@bot.tree.command(name="상자열기", description="상자를 열어서 제작 재료를 얻는다", guild=GUILD)
+@app_commands.describe(상자="열 상자 이름", 갯수="열 갯수")
+async def open_chest(interaction: discord.Interaction, 상자: str, 갯수: int = 1):
+    user_id = interaction.user.id
+    get_item_bag(user_id)
+
+    if 상자 not in CHEST_DROP_TABLE:
+        await interaction.response.send_message("❌ 그런 상자는 없음.", ephemeral=True)
+        return
+
+    if 갯수 <= 0:
+        await interaction.response.send_message("❌ 1개 이상 열어야 함.", ephemeral=True)
+        return
+
+    have = get_item_count(user_id, 상자)
+    if have < 갯수:
+        await interaction.response.send_message(
+            f"❌ 상자 부족함.\n보유: **{have}개**",
+            ephemeral=True
+        )
+        return
+
+    results = {}
+
+    for _ in range(갯수):
+        item_name = open_chest_once(user_id, 상자)
+        if item_name is None:
+            break
+        results[item_name] = results.get(item_name, 0) + 1
+
+    save_data()
+
+    result_text = "\n".join(
+        f"**{name}** x{count}"
+        for name, count in results.items()
+    )
+
+    await interaction.response.send_message(
+        f"📦 **상자 개봉 완료!**\n\n"
+        f"개봉 상자: **{상자} x{갯수}개**\n\n"
+        f"획득:\n{result_text}"
+    )
+
+
+@bot.tree.command(name="팔기2", description="아이템을 판매한다", guild=GUILD)
+@app_commands.describe(아이템="판매할 아이템 이름", 갯수="판매할 갯수")
+async def sell_item(interaction: discord.Interaction, 아이템: str, 갯수: int):
+    user_id = interaction.user.id
+
+    get_wallet(user_id)
+    get_item_bag(user_id)
+
+    if 아이템 not in ITEM_DATA:
+        await interaction.response.send_message("❌ 그런 아이템은 없음.", ephemeral=True)
+        return
+
+    if 갯수 <= 0:
+        await interaction.response.send_message("❌ 1개 이상 팔아야 한다.", ephemeral=True)
+        return
+
+    have = get_item_count(user_id, 아이템)
+
+    if have < 갯수:
+        await interaction.response.send_message(
+            f"❌ {아이템} 부족함.\n보유: **{have}개**",
+            ephemeral=True
+        )
+        return
+
+    total_price = int(ITEM_DATA[아이템]["price"]) * 갯수
+    remove_item(user_id, 아이템, 갯수)
+    money_data[str(user_id)] += total_price
+    save_data()
+
+    await interaction.response.send_message(
+        f"💰 아이템 판매 완료!\n\n"
+        f"판매 아이템: **{아이템}**\n"
+        f"판매 수량: **{갯수}개**\n"
+        f"획득 금액: **{money(total_price)}원**\n\n"
+        f"현재 잔액: **{money(money_data[str(user_id)])}원**"
+    )
+
+
+@bot.tree.command(name="전체팔기2", description="보유한 모든 아이템을 판매한다", guild=GUILD)
+async def sell_all_items(interaction: discord.Interaction):
+    user_id = interaction.user.id
+
+    get_wallet(user_id)
+    get_item_bag(user_id)
+
+    bag = item_bags[str(user_id)]
+
+    if not bag:
+        await interaction.response.send_message("🎒 아이템 가방이 비어있다.", ephemeral=True)
+        return
+
+    total_price = 0
+    sold_lines = []
+
+    for name, count in list(bag.items()):
+        if name not in ITEM_DATA:
+            continue
+        price = int(ITEM_DATA[name]["price"]) * int(count)
+        total_price += price
+        sold_lines.append(f"{name}: {count}개")
+
+    if total_price <= 0:
+        await interaction.response.send_message("❌ 판매 가능한 아이템이 없음.", ephemeral=True)
+        return
+
+    item_bags[str(user_id)] = {}
+    money_data[str(user_id)] += total_price
+    save_data()
+
+    sold_text = "\n".join(sold_lines)
+
+    await interaction.response.send_message(
+        f"💰 **아이템 전체 판매 완료!**\n\n"
+        f"{sold_text}\n\n"
+        f"획득 금액: **{money(total_price)}원**\n\n"
+        f"현재 잔액: **{money(money_data[str(user_id)])}원**"
+    )
+
+
 @bot.tree.command(name="도감", description="내가 잡아본 물고기 도감 확인", guild=GUILD)
 async def fish_book(interaction: discord.Interaction):
     user_id = interaction.user.id
@@ -2496,7 +2806,7 @@ async def fishing_shop(
 
     get_wallet(user_id)
     get_fishing_gear(user_id)
-    get_mining(user_id)
+    get_item_bag(user_id)
 
     if 종류 not in ["낚싯대", "미끼"]:
         await interaction.response.send_message(
@@ -2516,7 +2826,7 @@ async def fishing_shop(
 
         rod = ROD_DATA[이름]
         price = rod["price"]
-        ore_costs = rod.get("ores", {})
+        item_costs = rod.get("items", {})
 
         if money_data[user_id] < price:
             await interaction.response.send_message(
@@ -2525,13 +2835,13 @@ async def fishing_shop(
             )
             return
 
-        for ore_name, need_count in ore_costs.items():
-            have_count = get_ore_count(user_id, ore_name)
+        for item_name, need_count in item_costs.items():
+            have_count = get_item_count(user_id, item_name)
 
             if have_count < need_count:
                 await interaction.response.send_message(
-                    f"❌ 광석 부족.\n"
-                    f"필요: **{ore_name} x{need_count}**\n"
+                    f"❌ 제작 재료 부족.\n"
+                    f"필요: **{item_name} x{need_count}**\n"
                     f"보유: **{have_count}개**",
                     ephemeral=True
                 )
@@ -2539,26 +2849,20 @@ async def fishing_shop(
 
         money_data[user_id] -= price
 
-        for ore_name, need_count in ore_costs.items():
-            remove_ore_from_bag(user_id, ore_name, need_count)
+        for item_name, need_count in item_costs.items():
+            remove_item(user_id, item_name, need_count)
 
         owned_rods[user_id].append(이름)
         equipped_rods[user_id] = 이름
         save_data()
 
-        ore_text = ", ".join(
-            f"{ore} x{count}"
-            for ore, count in ore_costs.items()
-        )
-
-        if not ore_text:
-            ore_text = "없음"
+        item_text = item_cost_text(item_costs)
 
         await interaction.response.send_message(
             f"🎣 낚싯대 구매 완료!\n\n"
             f"구매: **{이름}**\n"
             f"가격: **{money(price)}원**\n"
-            f"사용 광석: **{ore_text}**\n"
+            f"사용 재료: **{item_text}**\n"
             f"자동 장착됨.\n\n"
             f"현재 잔액: **{money(money_data[user_id])}원**"
         )
@@ -2604,18 +2908,12 @@ async def fishing_shop_list(interaction: discord.Interaction):
         if name == "기본 낚싯대":
             continue
 
-        ore_text = ", ".join(
-            f"{ore} x{count}"
-            for ore, count in data.get("ores", {}).items()
-        )
-
-        if not ore_text:
-            ore_text = "없음"
+        item_text = item_cost_text(data.get("items", {}))
 
         rod_lines.append(
             f"**{name}**\n"
             f"가격: **{money(data['price'])}원**\n"
-            f"재료: **{ore_text}**\n"
+            f"재료: **{item_text}**\n"
             f"운빨: **+{data['luck']}%**\n"
             f"시간 감소: **{data['time_reduce']}%**\n"
             f"더블 확률: **{data['double_chance']}%**\n"
