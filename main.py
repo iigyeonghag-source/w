@@ -2647,6 +2647,74 @@ async def chest_count_autocomplete(interaction: discord.Interaction, current: st
         print(f"[상자 갯수 자동완성 오류] {repr(e)}")
         return []
 
+
+async def sell_item_autocomplete(interaction: discord.Interaction, current: str):
+    try:
+        user_id = interaction.user.id
+        bag = get_item_bag(user_id)
+        current_lower = (current or "").lower()
+
+        choices = []
+        for item_name, count in sorted(bag.items()):
+            count = int(count)
+            if count <= 0:
+                continue
+            if item_name not in ITEM_DATA:
+                continue
+            if current_lower and current_lower not in item_name.lower():
+                continue
+
+            data = ITEM_DATA.get(item_name, {})
+            type_text = "상자" if data.get("type") == "chest" else "재료"
+            price = int(data.get("price", 0))
+
+            choices.append(app_commands.Choice(
+                name=f"{item_name} x{count} / {type_text} / 개당 {money(price)}",
+                value=item_name
+            ))
+
+        return choices[:25]
+
+    except Exception as e:
+        print(f"[아이템 판매 자동완성 오류] {repr(e)}")
+        return []
+
+
+async def sell_item_count_autocomplete(interaction: discord.Interaction, current: str):
+    try:
+        user_id = interaction.user.id
+        bag = get_item_bag(user_id)
+        selected_item = getattr(interaction.namespace, "아이템", None)
+
+        if not selected_item:
+            return []
+
+        owned_count = int(bag.get(selected_item, 0))
+        if owned_count <= 0:
+            return []
+
+        counts = [1, 5, 10, 30, 50, 100]
+        counts = [c for c in counts if c <= owned_count]
+
+        if owned_count not in counts:
+            counts.append(owned_count)
+
+        current_text = str(current or "")
+        choices = []
+        for count in counts:
+            if current_text and current_text not in str(count):
+                continue
+            choices.append(app_commands.Choice(
+                name=f"{count}개 팔기",
+                value=count
+            ))
+
+        return choices[:25]
+
+    except Exception as e:
+        print(f"[아이템 판매 갯수 자동완성 오류] {repr(e)}")
+        return []
+
 # =========================
 # 명령어
 # =========================
@@ -2982,8 +3050,9 @@ async def open_chest(
         f"획득:\n{result_text}"
     )
 @bot.tree.command(name="팔기2", description="아이템을 판매한다", guild=GUILD)
-@app_commands.describe(아이템="판매할 아이템 이름", 갯수="판매할 갯수")
-async def sell_item(interaction: discord.Interaction, 아이템: str, 갯수: int):
+@app_commands.describe(아이템="판매할 아이템을 선택하세요", 갯수="판매할 갯수를 선택하세요")
+@app_commands.autocomplete(아이템=sell_item_autocomplete, 갯수=sell_item_count_autocomplete)
+async def sell_item(interaction: discord.Interaction, 아이템: str, 갯수: int = 1):
     user_id = interaction.user.id
 
     get_wallet(user_id)
