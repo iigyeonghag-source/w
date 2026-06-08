@@ -57,6 +57,7 @@ fish_tanks = NormalizedDict()
 fish_dex = NormalizedDict()
 item_bags = NormalizedDict()
 chest_pity = NormalizedDict()
+gacha_pity = NormalizedDict()
 
 owned_rods = NormalizedDict()
 equipped_rods = NormalizedDict()
@@ -87,7 +88,7 @@ def _restore_datetime(value):
 
 def load_maro():
     global money_data
-    global fish_tanks, fish_dex, item_bags, chest_pity
+    global fish_tanks, fish_dex, item_bags, chest_pity, gacha_pity
     global owned_rods, equipped_rods, owned_baits, equipped_baits
     global fish_market, last_market_update, fishing_cooldowns
 
@@ -114,6 +115,10 @@ def load_maro():
         str(k): int(v)
         for k, v in loaded.get("chest_pity", {}).items()
     })
+    gacha_pity = NormalizedDict({
+        str(k): int(v)
+        for k, v in loaded.get("gacha_pity", {}).items()
+    })
 
     owned_rods = NormalizedDict(loaded.get("owned_rods", {}))
     equipped_rods = NormalizedDict(loaded.get("equipped_rods", {}))
@@ -135,6 +140,7 @@ def save_data():
         "fish_dex": dict(globals().get("fish_dex", {})),
         "item_bags": dict(globals().get("item_bags", {})),
         "chest_pity": dict(globals().get("chest_pity", {})),
+        "gacha_pity": dict(globals().get("gacha_pity", {})),
         "owned_rods": dict(globals().get("owned_rods", {})),
         "equipped_rods": dict(globals().get("equipped_rods", {})),
         "owned_baits": dict(globals().get("owned_baits", {})),
@@ -1435,6 +1441,7 @@ fish_tanks = globals().get("fish_tanks", {})
 fish_dex = globals().get("fish_dex", {})
 item_bags = globals().get("item_bags", {})
 chest_pity = globals().get("chest_pity", {})
+gacha_pity = globals().get("gacha_pity", {})
 
 owned_rods = globals().get("owned_rods", {})
 equipped_rods = globals().get("equipped_rods", {})
@@ -2537,90 +2544,12 @@ async def fishing_success(interaction: discord.Interaction):
     view.message = await interaction.original_response()
     asyncio.create_task(view.start_battle())
 
-GACHA_CHESTS = {
-    "낡은 재료 상자": 60,
-    "평범한 재료 상자": 25,
-    "고급 재료 상자": 10,
-    "희귀 재료 상자": 4,
-    "전설 재료 상자": 1,
-}
-
-async def chest_autocomplete(interaction: discord.Interaction, current: str):
-    try:
-        user_id = interaction.user.id
-        get_item_bag(user_id)
-
-        bag = item_bag.get(user_id, {})
-
-        choices = []
-
-        for item_name, count in bag.items():
-            if count <= 0:
-                continue
-
-            if "상자" not in item_name:
-                continue
-
-            if current and current not in item_name:
-                continue
-
-            choices.append(
-                app_commands.Choice(
-                    name=f"{item_name} x{count}",
-                    value=item_name
-                )
-            )
-
-        return choices[:25]
-
-    except Exception as e:
-        print(f"[상자 자동완성 오류] {repr(e)}")
-        return []
-    
 # =========================
-# 뽑기 천장 설정
+# 뽑기 / 상자 선택 설정
 # =========================
 
 PITY_LIMIT = 50
-PITY_CHEST = "전설 재료 상자"
-
-if "gacha_pity" not in globals():
-    gacha_pity = {}
-
-def get_gacha_pity(user_id):
-    user_id = str(user_id)
-
-    if user_id not in gacha_pity:
-        gacha_pity[user_id] = 0
-
-    return gacha_pity[user_id]
-
-
-def roll_gacha_chest_with_pity(user_id):
-    user_id = str(user_id)
-
-    if user_id not in gacha_pity:
-        gacha_pity[user_id] = 0
-
-    gacha_pity[user_id] += 1
-
-    # 천장
-    if gacha_pity[user_id] >= PITY_LIMIT:
-        gacha_pity[user_id] = 0
-        return PITY_CHEST
-
-    chest_name = roll_gacha_chest()
-
-    # 전설 상자 뜨면 천장 초기화
-    if chest_name == PITY_CHEST:
-        gacha_pity[user_id] = 0
-
-    return chest_name
-
-
-# =========================
-# 뽑기 횟수 선택지
-# =========================
+PITY_CHEST = "심해의 보물 상자"
 
 GACHA_COUNT_CHOICES = [
     app_commands.Choice(name="1회", value=1),
@@ -2630,58 +2559,69 @@ GACHA_COUNT_CHOICES = [
     app_commands.Choice(name="100회", value=100),
 ]
 
-# =========================
-# 상자 자동완성
-# =========================
+
+def get_gacha_pity(user_id):
+    uid = str(user_id)
+    if uid not in gacha_pity:
+        gacha_pity[uid] = 0
+        save_data()
+    return int(gacha_pity[uid])
+
+
+def roll_gacha_chest_with_pity(user_id):
+    uid = str(user_id)
+    gacha_pity[uid] = int(gacha_pity.get(uid, 0)) + 1
+
+    if gacha_pity[uid] >= PITY_LIMIT:
+        gacha_pity[uid] = 0
+        save_data()
+        return PITY_CHEST
+
+    chest_name = roll_gacha_chest()
+
+    if chest_name == PITY_CHEST:
+        gacha_pity[uid] = 0
+
+    save_data()
+    return chest_name
+
 
 async def chest_autocomplete(interaction: discord.Interaction, current: str):
     try:
         user_id = interaction.user.id
-        get_item_bag(user_id)
-
-        bag = item_bag.get(user_id, {})
+        bag = get_item_bag(user_id)
+        current_lower = (current or "").lower()
 
         choices = []
-
-        for item_name, count in bag.items():
-            if count <= 0:
+        for item_name, count in sorted(bag.items()):
+            if int(count) <= 0:
                 continue
-
-            if "상자" not in item_name:
+            if ITEM_DATA.get(item_name, {}).get("type") != "chest":
                 continue
-
-            if current and current not in item_name:
+            if current_lower and current_lower not in item_name.lower():
                 continue
-
-            choices.append(
-                app_commands.Choice(
-                    name=f"{item_name} x{count}",
-                    value=item_name
-                )
-            )
+            choices.append(app_commands.Choice(
+                name=f"{item_name} x{count}",
+                value=item_name
+            ))
 
         return choices[:25]
 
     except Exception as e:
         print(f"[상자 자동완성 오류] {repr(e)}")
         return []
-        
-# =========================
-# 갯수 자동완성
-# =========================
+
 
 async def chest_count_autocomplete(interaction: discord.Interaction, current: str):
     try:
         user_id = interaction.user.id
-        get_item_bag(user_id)
-
+        bag = get_item_bag(user_id)
         selected_chest = getattr(interaction.namespace, "상자", None)
 
         if not selected_chest:
             return []
 
-        owned_count = item_bag.get(user_id, {}).get(selected_chest, 0)
-
+        owned_count = int(bag.get(selected_chest, 0))
         if owned_count <= 0:
             return []
 
@@ -2691,20 +2631,15 @@ async def chest_count_autocomplete(interaction: discord.Interaction, current: st
         if owned_count not in counts:
             counts.append(owned_count)
 
+        current_text = str(current or "")
         choices = []
-
         for count in counts:
-            text = str(count)
-
-            if current and current not in text:
+            if current_text and current_text not in str(count):
                 continue
-
-            choices.append(
-                app_commands.Choice(
-                    name=f"{count}개 열기",
-                    value=count
-                )
-            )
+            choices.append(app_commands.Choice(
+                name=f"{count}개 열기",
+                value=count
+            ))
 
         return choices[:25]
 
@@ -2995,25 +2930,18 @@ async def open_chest(
     상자: str,
     갯수: int = 1
 ):
-    user_id = str(interaction.user.id)
-
-    get_item_bag(user_id)
+    user_id = interaction.user.id
+    bag = get_item_bag(user_id)
 
     if 갯수 <= 0:
-        await interaction.response.send_message(
-            "❌ 1개 이상 열어야 함.",
-            ephemeral=True
-        )
+        await interaction.response.send_message("❌ 1개 이상 열어야 함.", ephemeral=True)
         return
 
-    if "상자" not in 상자:
-        await interaction.response.send_message(
-            "❌ 상자만 열 수 있음.",
-            ephemeral=True
-        )
+    if 상자 not in CHEST_DROP_TABLE or ITEM_DATA.get(상자, {}).get("type") != "chest":
+        await interaction.response.send_message("❌ 열 수 있는 상자가 아님.", ephemeral=True)
         return
 
-    owned_count = item_bag.get(user_id, {}).get(상자, 0)
+    owned_count = int(bag.get(상자, 0))
 
     if owned_count <= 0:
         await interaction.response.send_message(
@@ -3031,32 +2959,26 @@ async def open_chest(
         )
         return
 
-    item_bag[user_id][상자] -= 갯수
-
     results = {}
 
     for _ in range(갯수):
-        reward_items = open_gacha_chest(상자)
+        item_name = open_chest_once(user_id, 상자)
+        if item_name is None:
+            break
+        results[item_name] = results.get(item_name, 0) + 1
 
-        for item_name, amount in reward_items.items():
-            add_item(user_id, item_name, amount)
-            results[item_name] = results.get(item_name, 0) + amount
+    remaining = get_item_count(user_id, 상자)
 
-    save_data()
-
-    if results:
-        result_text = "\n".join(
-            f"🧩 **{name}** x{amount}"
-            for name, amount in results.items()
-        )
-    else:
-        result_text = "없음"
+    result_text = "\n".join(
+        f"🧩 **{name}** x{amount}"
+        for name, amount in sorted(results.items())
+    ) if results else "없음"
 
     await interaction.response.send_message(
         f"📦 **상자 개봉 완료!**\n\n"
         f"상자: **{상자}**\n"
-        f"개봉 수: **{갯수}개**\n"
-        f"남은 상자: **{item_bag[user_id].get(상자, 0)}개**\n\n"
+        f"개봉 수: **{sum(results.values())}개**\n"
+        f"남은 상자: **{remaining}개**\n\n"
         f"획득:\n{result_text}"
     )
 @bot.tree.command(name="팔기2", description="아이템을 판매한다", guild=GUILD)
