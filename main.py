@@ -178,7 +178,7 @@ def remove_maro(user_id, amount):
 
 
 def money(amount):
-    return f"{int(amount):,}"
+    return f"{int(amount):,}원"
 
 
 def get_item_display_name(item, fallback="알 수 없음"):
@@ -1917,9 +1917,9 @@ class FishBattleView(discord.ui.View):
             caught_text.append(
                 f"잡은 물고기: **{fish['display_name']}**\n"
                 f"무게: **{fish['kg']}kg**\n"
-                f"기본 판매가: **{money(fish['price'])}원**\n"
+                f"기본 판매가: **{money(fish['price'])}**\n"
                 f"{get_market_text(fish['name'])}\n"
-                f"현재 판매가: **{money(get_market_price(fish['name'], fish['price']))}원**"
+                f"현재 판매가: **{money(get_market_price(fish['name'], fish['price']))}**"
                 f"{trait_text}"
             )
 
@@ -2150,9 +2150,9 @@ class BossFishingView(discord.ui.View):
                 f"🔥🐲 **보스 낚시 성공!**\n\n"
                 f"잡은 보스: **{fish['display_name']}**\n"
                 f"무게: **{fish['kg']}kg**\n"
-                f"기본 판매가: **{money(fish['price'])}원**\n"
+                f"기본 판매가: **{money(fish['price'])}**\n"
                 f"{get_market_text(fish['name'])}\n"
-                f"현재 판매가: **{money(get_market_price(fish['name'], fish['price']))}원**"
+                f"현재 판매가: **{money(get_market_price(fish['name'], fish['price']))}**"
                 f"{trait_text}\n\n"
                 f"사용 낚싯대: **{self.rod_name}**\n"
                 f"사용 미끼: **{self.bait_name}**"
@@ -2223,8 +2223,8 @@ async def fishing_success(interaction: discord.Interaction):
             content=(
                 f"🐟💀 간고등어 출현\n\n"
                 f"간고등어가 당신의 지갑을 물고 튀었다..\n"
-                f"💸 -{money(stolen)}원\n\n"
-                f"현재 잔액: **{money(money_data[user_id])}원**"
+                f"💸 -{money(stolen)}\n\n"
+                f"현재 잔액: **{money(money_data[user_id])}**"
             ),
             view=None
         )
@@ -2394,12 +2394,12 @@ async def fish_tank(interaction: discord.Interaction):
     for (base_name, trait), info in sorted(grouped.items(), key=lambda x: x[1]["display_name"]):
         lines.append(
             f"🐟 **{info['display_name']}** x{info['count']}마리 / "
-            f"총 {info['kg']:.2f}kg / 현재 판매가 {money(info['price'])}원"
+            f"총 {info['kg']:.2f}kg / 현재 판매가 {money(info['price'])}"
         )
 
     save_data()
 
-    header = f"🐠 **내 어항** | 총 {len(tank)}마리 / 묶음 {len(grouped)}개 / 예상가 {money(total_value)}원\n\n"
+    header = f"🐠 **내 어항** | 총 {len(tank)}마리 / 묶음 {len(grouped)}개 / 예상가 {money(total_value)}\n\n"
     content = header + "\n".join(lines)
 
     if len(content) <= 2000:
@@ -2433,7 +2433,7 @@ async def detail_fish_tank(interaction: discord.Interaction):
         price = get_market_price(fish.get("name", name), fish.get("price", 0))
 
         lines.append(
-            f"{name} | [{trait}] | {kg:.2f}kg | {money(price)}원"
+            f"{name} | [{trait}] | {kg:.2f}kg | {money(price)}"
         )
 
     save_data()
@@ -2504,8 +2504,8 @@ async def sell_fish(interaction: discord.Interaction, 물고기: str, 갯수: in
         f"💰 판매 완료!\n\n"
         f"판매 물고기: **{물고기}**\n"
         f"판매 수량: **{갯수}마리**\n"
-        f"획득 금액: **{money(total_price)}원**\n\n"
-        f"현재 잔액: **{money(money_data[user_id])}원**"
+        f"획득 금액: **{money(total_price)}**\n\n"
+        f"현재 잔액: **{money(money_data[user_id])}**"
     )
 
 
@@ -2549,8 +2549,8 @@ async def sell_all_fish(interaction: discord.Interaction):
         f"💰 **전체 판매 완료!**\n\n"
         f"{sold_text}\n\n"
         f"판매 수량: **{total_count}마리**\n"
-        f"획득 금액: **{money(total_price)}원**\n\n"
-        f"현재 잔액: **{money(money_data[user_id])}원**"
+        f"획득 금액: **{money(total_price)}**\n\n"
+        f"현재 잔액: **{money(money_data[user_id])}**"
     )
 
 
@@ -2575,11 +2575,11 @@ async def my_items(interaction: discord.Interaction):
         total_value += price
         type_text = "상자" if data.get("type") == "chest" else "재료"
         lines.append(
-            f"📦 **{name}** x{count} / {type_text} / {data.get('grade', '알 수 없음')} / 판매가 {money(price)}원"
+            f"📦 **{name}** x{count} / {type_text} / {data.get('grade', '알 수 없음')} / 판매가 {money(price)}"
         )
 
     content = (
-        f"🎒 **내 아이템** | 종류 {len(bag)}개 / 예상가 {money(total_value)}원\n\n"
+        f"🎒 **내 아이템** | 종류 {len(bag)}개 / 예상가 {money(total_value)}\n\n"
         + "\n".join(lines)
     )
 
@@ -2669,8 +2669,8 @@ async def sell_item(interaction: discord.Interaction, 아이템: str, 갯수: in
         f"💰 아이템 판매 완료!\n\n"
         f"판매 아이템: **{아이템}**\n"
         f"판매 수량: **{갯수}개**\n"
-        f"획득 금액: **{money(total_price)}원**\n\n"
-        f"현재 잔액: **{money(money_data[str(user_id)])}원**"
+        f"획득 금액: **{money(total_price)}**\n\n"
+        f"현재 잔액: **{money(money_data[str(user_id)])}**"
     )
 
 
@@ -2710,8 +2710,8 @@ async def sell_all_items(interaction: discord.Interaction):
     await interaction.response.send_message(
         f"💰 **아이템 전체 판매 완료!**\n\n"
         f"{sold_text}\n\n"
-        f"획득 금액: **{money(total_price)}원**\n\n"
-        f"현재 잔액: **{money(money_data[str(user_id)])}원**"
+        f"획득 금액: **{money(total_price)}**\n\n"
+        f"현재 잔액: **{money(money_data[str(user_id)])}**"
     )
 
 
@@ -2749,8 +2749,8 @@ async def fish_info(interaction: discord.Interaction, 물고기: str):
         f"🐟 **{물고기} 정보**\n\n"
         f"무게 범위: **{data['min_kg']}kg ~ {data['max_kg']}kg**\n"
         f"서식지: **{data['habitat']}**\n"
-        f"기본 판매가격: **{money(data['base_price'])}원**\n"
-        f"kg당 추가 가격: **{money(data['kg_price'])}원**\n"
+        f"기본 판매가격: **{money(data['base_price'])}**\n"
+        f"kg당 추가 가격: **{money(data['kg_price'])}**\n"
         f"{get_market_text(물고기)}\n\n"
         f"판매가 계산식:\n"
         f"`기본 가격 + kg × kg당 가격 × 현재 시세`"
@@ -2830,7 +2830,7 @@ async def fishing_shop(
 
         if money_data[user_id] < price:
             await interaction.response.send_message(
-                f"❌ 돈 부족.\n필요 금액: {money(price)}원\n현재 잔액: {money(money_data[user_id])}원",
+                f"❌ 돈 부족.\n필요 금액: {money(price)}\n현재 잔액: {money(money_data[user_id])}",
                 ephemeral=True
             )
             return
@@ -2861,10 +2861,10 @@ async def fishing_shop(
         await interaction.response.send_message(
             f"🎣 낚싯대 구매 완료!\n\n"
             f"구매: **{이름}**\n"
-            f"가격: **{money(price)}원**\n"
+            f"가격: **{money(price)}**\n"
             f"사용 재료: **{item_text}**\n"
             f"자동 장착됨.\n\n"
-            f"현재 잔액: **{money(money_data[user_id])}원**"
+            f"현재 잔액: **{money(money_data[user_id])}**"
         )
         return
 
@@ -2881,7 +2881,7 @@ async def fishing_shop(
 
         if money_data[user_id] < price:
             await interaction.response.send_message(
-                f"❌ 돈 부족.\n필요 금액: {money(price)}원\n현재 잔액: {money(money_data[user_id])}원",
+                f"❌ 돈 부족.\n필요 금액: {money(price)}\n현재 잔액: {money(money_data[user_id])}",
                 ephemeral=True
             )
             return
@@ -2894,9 +2894,9 @@ async def fishing_shop(
         await interaction.response.send_message(
             f"🪱 미끼 구매 완료!\n\n"
             f"구매: **{이름} x{갯수}개**\n"
-            f"가격: **{money(price)}원**\n"
+            f"가격: **{money(price)}**\n"
             f"자동 장착됨.\n\n"
-            f"현재 잔액: **{money(money_data[user_id])}원**"
+            f"현재 잔액: **{money(money_data[user_id])}**"
         )
 
 
@@ -2912,7 +2912,7 @@ async def fishing_shop_list(interaction: discord.Interaction):
 
         rod_lines.append(
             f"**{name}**\n"
-            f"가격: **{money(data['price'])}원**\n"
+            f"가격: **{money(data['price'])}**\n"
             f"재료: **{item_text}**\n"
             f"운빨: **+{data['luck']}%**\n"
             f"시간 감소: **{data['time_reduce']}%**\n"
@@ -2923,7 +2923,7 @@ async def fishing_shop_list(interaction: discord.Interaction):
     rod_text = "\n\n".join(rod_lines)
 
     bait_text = "\n".join(
-        f"**{name}** - {money(data['price'])}원 / 희귀 확률 +{data['luck']}%"
+        f"**{name}** - {money(data['price'])} / 희귀 확률 +{data['luck']}%"
         for name, data in BAIT_DATA.items()
         if name != "미끼 없음"
     )
@@ -3070,8 +3070,8 @@ class LostItemReturnView(discord.ui.View):
             content=(
                 f"🙇‍♂️ 주인이 찾아왔다!\n\n"
                 f"“정말 감사합니다! 이거라도 받아주세요.”\n\n"
-                f"🎁 보상금: **{money(reward)}원**\n"
-                f"현재 잔액: **{money(money_data[self.user_id])}원**"
+                f"🎁 보상금: **{money(reward)} **\n"
+                f"현재 잔액: **{money(money_data[self.user_id])} **"
             ),
             view=None
         )
