@@ -3179,7 +3179,8 @@ class FishDexJumpModal(discord.ui.Modal, title="도감 페이지 이동"):
 
 class FishDexNavButton(discord.ui.Button):
     def __init__(self, label, action):
-        super().__init__(label=label, style=discord.ButtonStyle.gray, row=4)
+        style = discord.ButtonStyle.danger if action == "close" else discord.ButtonStyle.gray
+        super().__init__(label=label, style=style, row=4)
         self.action = action
 
     async def callback(self, interaction: discord.Interaction):
@@ -3198,10 +3199,15 @@ class FishDexNavButton(discord.ui.Button):
         elif self.action == "back":
             view.mode = "list"
             view.selected_fish = None
+        elif self.action == "close":
+            await interaction.response.edit_message(
+                content="📖 도감을 닫았습니다.",
+                view=None
+            )
+            return
 
         view.refresh_items()
         await interaction.response.edit_message(content=view.render(), view=view)
-
 
 class FishDexFishButton(discord.ui.Button):
     def __init__(self, fish_name, caught, row):
