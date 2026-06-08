@@ -2638,30 +2638,25 @@ async def chest_autocomplete(interaction: discord.Interaction, current: str):
     try:
         user_id = interaction.user.id
         get_item_bag(user_id)
-
         bag = item_bag.get(user_id, {})
+        print(f"[자동완성 진단] user_id={user_id}")
+        print(f"[자동완성 진단] bag={bag}")
+        print(f"[자동완성 진단] current='{current}'")
 
         choices = []
-
         for item_name, count in bag.items():
             if count <= 0:
                 continue
-
             if "상자" not in item_name:
                 continue
-
             if current and current not in item_name:
                 continue
-
             choices.append(
-                app_commands.Choice(
-                    name=f"{item_name} x{count}",
-                    value=item_name
-                )
+                app_commands.Choice(name=f"{item_name} x{count}", value=item_name)
             )
 
+        print(f"[자동완성 진단] choices={choices}")
         return choices[:25]
-
     except Exception as e:
         print(f"[상자 자동완성 오류] {repr(e)}")
         return []
