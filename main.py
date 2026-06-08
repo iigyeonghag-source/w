@@ -407,12 +407,12 @@ FISH_DATA = {
     },
 
     "은어": {
-    "min_kg": 0.3,
-    "max_kg": 2.0,
-    "habitat": "맑은 강",
-    "base_price": 15100,
-    "kg_price": 570,
-    "chance": 24
+        "min_kg": 0.3,
+        "max_kg": 2.0,
+        "habitat": "맑은 강",
+        "base_price": 15100,
+        "kg_price": 570,
+        "chance": 24
     },
 
     "농어": {
@@ -1097,6 +1097,29 @@ CHEST_DROP_TABLE = {
     ],
 }
 
+
+GACHA_PRICE = 100000
+GACHA_CHEST_TABLE = [
+    ("낡은 부품 상자", 78),
+    ("신비한 부품 상자", 20),
+    ("심해의 보물 상자", 2),
+]
+
+
+def roll_gacha_chest():
+    names = [name for name, weight in GACHA_CHEST_TABLE]
+    weights = [weight for name, weight in GACHA_CHEST_TABLE]
+    return random.choices(names, weights=weights, k=1)[0]
+
+
+def gacha_rate_text():
+    total = sum(weight for name, weight in GACHA_CHEST_TABLE)
+    return "\n".join(
+        f"{name}: **{weight / total * 100:.2f}%**"
+        for name, weight in GACHA_CHEST_TABLE
+    )
+
+
 ROD_CRAFT_COSTS = {
     "초급 낚싯대": {"낡은 릴": 1, "질긴 낚싯줄": 2},
     "중급 낚싯대": {"낡은 릴": 2, "질긴 낚싯줄": 4, "강철 바늘": 2},
@@ -1188,6 +1211,206 @@ def item_cost_text(costs):
     if not costs:
         return "없음"
     return ", ".join(f"{name} x{count}" for name, count in costs.items())
+
+    pity = int(chest_pity.get(uid, 0))
+    chance = min(35, 8 + pity * 2)
+
+    if random.randint(1, 100) > chance:
+        chest_pity[uid] = pity + 1
+        save_data()
+        return None
+
+    chest_pity[uid] = 0
+    chest_name = random.choices(
+        ["낡은 부품 상자", "신비한 부품 상자", "심해의 보물 상자"],
+        weights=[75, 22, 3],
+        k=1
+    )[0]
+    add_item(user_id, chest_name, 1)
+    return chest_name
+
+
+def item_cost_text(costs):
+    if not costs:
+        return "없음"
+    return ", ".join(f"{name} x{count}" for name, count in costs.items())
+
+
+FISH_DESCRIPTIONS = {
+    '젖은 종이': "물에 푹 젖어 글씨조차 읽기 어려운 종이다. 원래 무엇이 적혀 있었는지는 알 수 없다.",
+    '비닐봉지': "바다를 떠돌다 걸려 올라온 비닐봉지다. 물고기보다 먼저 낚이는 경우가 많다.",
+    '찢어진 양말': "이곳저곳 찢어져 본래 모습을 알아보기 힘든 양말이다. 주인은 이미 포기했을지도 모른다.",
+    '해초': "물속 바위에 붙어 자라는 해초다. 낚시꾼에게는 꽝이지만 바다 생물들에게는 소중한 보금자리다.",
+    '낡은 신발': "오랜 시간 물속에 잠겨 있던 신발이다. 누가 신고 있었는지는 아무도 모른다.",
+    '녹슨 깡통': "녹이 잔뜩 슨 통조림 깡통이다. 희미하게 Mutti라는 글자가 남아 있다.",
+    '폐타이어': "수명을 다한 낡은 타이어다. 물고기보다 이런 걸 낚으면 기분이 묘해진다.",
+    '구피': "화려한 꼬리와 작은 몸집을 가진 관상어. 수조 속을 유유히 헤엄치는 모습으로 많은 사랑을 받고 있다.",
+    '피라미': "맑은 강에서 무리를 지어 다니는 작은 민물고기. 크기는 작지만 움직임이 빨라 잡기 쉽지 않다.",
+    '부러진 낚싯대': "반으로 부러진 낚싯대의 잔해다. 거대한 물고기와 싸우다 부러졌을지도 모른다.",
+    '누군가의 지갑': "누군가 잃어버린 지갑이다. 생각보다 상태가 멀쩡해 주인을 찾을 수 있을지도 모른다.",
+    '잃어버린 카드': "방수팩 안에 보관되어 있던 카드다. 아직 사용할 수 있을 것처럼 깨끗하다.",
+    '카시오 시계': "오랜 시간 물에 잠겨 있었지만 아직도 작동하는 시계다. 대체 어떻게 버틴 걸까?",
+    '붕어': "연못과 강에서 흔히 볼 수 있는 친숙한 민물고기. 둥글고 통통한 몸이 특징이다.",
+    '금붕어': "붉고 주황빛 비늘이 아름다운 관상어. 사실 붕어를 오랜 세월 개량해 만들어진 품종이다.",
+    '잉어': "굵은 몸과 입가의 수염이 특징인 대형 민물고기. 강한 힘 덕분에 낚시꾼들에게 인기가 많다.",
+    '고등어': "따뜻한 바다를 무리 지어 이동하는 회유성 물고기. 등에는 푸른 줄무늬가 선명하게 나 있다.",
+    '고장난 스마트폰': "액정이 산산조각 난 스마트폰이다. 데이터는 이미 바다의 품으로 사라졌을지도 모른다.",
+    '메기': "긴 수염과 넓은 입을 가진 민물고기. 비늘이 없는 미끌미끌한 몸을 가지고 있다.",
+    '병어': "납작한 은빛 몸을 가진 바닷물고기. 무리를 지어 다니며 부드러운 살로 유명하다.",
+    '송어': "맑고 차가운 강과 계곡에 서식하는 육식성 물고기. 힘이 좋아 낚싯대를 크게 휘게 만든다.",
+    '배스': "큰 입과 강한 힘을 가진 대형 민물 포식어. 낚시꾼들 사이에서는 손맛 좋은 물고기로 유명하다.",
+    '놀래미': "바위가 많은 연안에서 자주 발견되는 물고기. 화려한 무늬와 강한 생명력을 가지고 있다.",
+    '은어': "맑고 깨끗한 강에서 서식하는 물고기. 오이 향과 비슷한 독특한 향기가 나는 것으로 유명하다.",
+    '농어': "바다와 강 하구를 오가며 살아가는 대형 포식어. 작은 물고기들을 사냥하며 빠른 돌진이 특징이다.",
+    '숭어': "강 하구와 연안에서 무리를 지어 다니는 물고기. 수면 위로 높이 뛰어오르는 모습이 자주 목격된다.",
+    '전어': "가을철이 되면 특히 맛이 좋아지는 은빛 물고기. 커다란 무리를 이루어 이동한다.",
+    '도루묵': "차가운 바다에서 살아가는 작은 물고기. 알이 가득 찬 겨울철에 특히 유명하다.",
+    '쏘가리': "맑은 강의 최상위 포식자로 불리는 민물고기. 몸의 검은 반점과 강한 힘이 특징이다.",
+    '볼락': "암초 주변에서 살아가는 야행성 물고기. 밤이 되면 더욱 활발하게 움직인다.",
+    '문어': "여덟 개의 다리를 가진 영리한 연체동물. 위험을 느끼면 먹물을 뿜어 적을 따돌린다.",
+    '해마': "말을 닮은 머리를 가진 작은 바다 생물. 수컷이 알을 품는 독특한 생태를 가지고 있다.",
+    '가재': "단단한 껍질과 큰 집게를 가진 갑각류. 바위 틈이나 강바닥에 숨어 지낸다.",
+    '청어': "은빛 비늘이 아름다운 회유성 물고기. 거대한 무리를 이루어 바다를 이동한다.",
+    '붉은 해파리': "붉은빛 몸체를 가진 해파리. 촉수에는 약한 독이 있어 함부로 만지면 위험하다.",
+    '검은 농어': "어두운 비늘을 가진 농어의 희귀한 변종. 일반 농어보다 더욱 공격적인 성향을 보인다.",
+    '도미': "붉은빛 비늘이 아름다운 바닷물고기. 예로부터 귀한 생선으로 취급받아 왔다.",
+    '청새치': "날카로운 창처럼 긴 주둥이를 가진 초대형 포식어. 바다에서 가장 빠른 물고기 중 하나다.",
+    '황금 잉어': "황금빛 비늘을 가진 희귀한 잉어. 행운을 가져다준다는 전설이 전해진다.",
+    '가물치': "거대한 입과 강한 생명력을 가진 민물 포식어. 산소가 부족한 환경에서도 오래 버틴다.",
+    '우럭': "바위가 많은 연안에서 자주 발견되는 물고기. 위장 능력이 뛰어나 주변 환경에 잘 녹아든다.",
+    '광어': "몸이 납작하고 두 눈이 한쪽으로 몰려 있는 독특한 물고기. 모래 바닥에 몸을 숨기고 사냥한다.",
+    '연어': "강에서 태어나 바다에서 성장한 뒤 다시 고향 강으로 돌아오는 회유성 물고기.",
+    '갈치': "칼날처럼 길고 은빛으로 빛나는 바닷물고기. 날카로운 이빨을 가지고 있다.",
+    '장어': "뱀처럼 길쭉한 몸을 가진 물고기. 강과 바다를 오가며 살아간다.",
+    '대구': "차가운 바다를 좋아하는 대형 물고기. 입 아래에 짧은 수염이 달려 있다.",
+    '복어': "위협을 느끼면 몸을 크게 부풀리는 독특한 물고기. 일부 부위에는 강한 독이 존재한다.",
+    '민어': "커다란 몸집과 뛰어난 힘을 가진 바닷물고기. 여름철 대표 어종으로 유명하다.",
+    '참치': "끊임없이 헤엄쳐야 살아갈 수 있는 대형 회유성 어류. 강력한 힘과 속도를 자랑한다.",
+    '무지개송어': "몸 옆을 따라 무지갯빛 줄무늬가 이어지는 송어. 양식장에서도 자주 볼 수 있다.",
+    '아귀': "거대한 입과 기괴한 외형을 가진 심해성 물고기. 머리 위의 돌기로 먹잇감을 유인한다.",
+    '비단잉어': "붉은색과 흰색 무늬가 아름다운 관상용 잉어. 연못의 보석이라 불린다.",
+    '철갑상어': "갑옷 같은 단단한 비늘을 가진 고대 어류. 수백만 년 전부터 거의 모습이 변하지 않았다.",
+    '다금바리': "거대한 몸집을 가진 고급 어종. 바위 틈에 숨어 먹잇감을 노린다.",
+    '얼음 송어': "차가운 마력이 흐르는 강에서 발견되는 송어. 비늘에서는 희미한 냉기가 흘러나온다.",
+    '그림자 메기': "어둠 속에 몸을 숨기는 희귀한 메기. 물속 그림자와 구별하기 어려울 정도다.",
+    '전기 뱀장어': "몸속에 강력한 전기를 저장하는 위험한 생물. 건드리면 감전될 수 있다.",
+    '별빛 해파리': "밤이 되면 은은하게 빛나는 신비로운 해파리. 마치 별이 바다에 떠 있는 것 같다.",
+    '무지개 고래어': "거대한 몸집과 무지갯빛 비늘을 가진 전설의 물고기. 목격담만 드물게 전해진다.",
+    '심연의 포식어': "빛조차 닿지 않는 심해에 서식하는 괴물 같은 물고기. 거대한 이빨을 가지고 있다.",
+    '아카브 심해종': "아카브 해역의 깊은 바다에서 발견된 미확인 생물. 인근 마족들이 주된 사냥감이라고 한다.",
+    '심해룡': "용을 닮은 거대한 심해 생물. 긴 몸체와 푸른 발광 기관을 가지고 있다.",
+    '심연 크라운': "머리 위에 왕관처럼 빛나는 기관을 가진 희귀종. 심해 생태계의 왕으로 불린다.",
+    '공허의 포식자': "심연보다 더 깊은 공허에서 나타난 존재. 주변의 빛과 생명력을 집어삼킨다.",
+    '메갈로돈': "고대 바다를 지배했던 초대형 상어. 전설 속에서는 아직까지 살아 있다고 전해진다.",
+    '크라켄': "거대한 촉수로 배를 바다 밑으로 끌어당긴다는 전설의 해양 괴수다."
+}
+
+
+FISH_CATCH_SETTINGS = {
+    '젖은 종이': {"catch_level": 1, "gauge_min": 45, "gauge_max": 80},
+    '비닐봉지': {"catch_level": 1, "gauge_min": 45, "gauge_max": 80},
+    '찢어진 양말': {"catch_level": 1, "gauge_min": 45, "gauge_max": 80},
+    '해초': {"catch_level": 1, "gauge_min": 45, "gauge_max": 80},
+    '낡은 신발': {"catch_level": 1, "gauge_min": 45, "gauge_max": 80},
+    '녹슨 깡통': {"catch_level": 1, "gauge_min": 45, "gauge_max": 80},
+    '폐타이어': {"catch_level": 8, "gauge_min": 60, "gauge_max": 105},
+    '구피': {"catch_level": 2, "gauge_min": 45, "gauge_max": 80},
+    '피라미': {"catch_level": 3, "gauge_min": 45, "gauge_max": 80},
+    '부러진 낚싯대': {"catch_level": 8, "gauge_min": 60, "gauge_max": 105},
+    '누군가의 지갑': {"catch_level": 30, "gauge_min": 120, "gauge_max": 210},
+    '잃어버린 카드': {"catch_level": 83, "gauge_min": 420, "gauge_max": 720},
+    '카시오 시계': {"catch_level": 79, "gauge_min": 260, "gauge_max": 460},
+    '붕어': {"catch_level": 4, "gauge_min": 45, "gauge_max": 80},
+    '금붕어': {"catch_level": 4, "gauge_min": 45, "gauge_max": 80},
+    '잉어': {"catch_level": 8, "gauge_min": 60, "gauge_max": 105},
+    '고등어': {"catch_level": 8, "gauge_min": 60, "gauge_max": 105},
+    '고장난 스마트폰': {"catch_level": 13, "gauge_min": 80, "gauge_max": 140},
+    '메기': {"catch_level": 12, "gauge_min": 80, "gauge_max": 140},
+    '병어': {"catch_level": 8, "gauge_min": 60, "gauge_max": 105},
+    '송어': {"catch_level": 9, "gauge_min": 60, "gauge_max": 105},
+    '배스': {"catch_level": 11, "gauge_min": 80, "gauge_max": 140},
+    '놀래미': {"catch_level": 9, "gauge_min": 60, "gauge_max": 105},
+    '은어': {"catch_level": 9, "gauge_min": 60, "gauge_max": 105},
+    '농어': {"catch_level": 12, "gauge_min": 80, "gauge_max": 140},
+    '숭어': {"catch_level": 10, "gauge_min": 60, "gauge_max": 105},
+    '전어': {"catch_level": 11, "gauge_min": 80, "gauge_max": 140},
+    '도루묵': {"catch_level": 11, "gauge_min": 80, "gauge_max": 140},
+    '쏘가리': {"catch_level": 14, "gauge_min": 80, "gauge_max": 140},
+    '볼락': {"catch_level": 10, "gauge_min": 60, "gauge_max": 105},
+    '문어': {"catch_level": 16, "gauge_min": 80, "gauge_max": 140},
+    '해마': {"catch_level": 11, "gauge_min": 80, "gauge_max": 140},
+    '가재': {"catch_level": 9, "gauge_min": 60, "gauge_max": 105},
+    '청어': {"catch_level": 10, "gauge_min": 60, "gauge_max": 105},
+    '붉은 해파리': {"catch_level": 13, "gauge_min": 80, "gauge_max": 140},
+    '검은 농어': {"catch_level": 16, "gauge_min": 80, "gauge_max": 140},
+    '도미': {"catch_level": 13, "gauge_min": 80, "gauge_max": 140},
+    '청새치': {"catch_level": 26, "gauge_min": 120, "gauge_max": 210},
+    '황금 잉어': {"catch_level": 27, "gauge_min": 120, "gauge_max": 210},
+    '가물치': {"catch_level": 17, "gauge_min": 80, "gauge_max": 140},
+    '우럭': {"catch_level": 12, "gauge_min": 80, "gauge_max": 140},
+    '광어': {"catch_level": 14, "gauge_min": 80, "gauge_max": 140},
+    '연어': {"catch_level": 15, "gauge_min": 80, "gauge_max": 140},
+    '갈치': {"catch_level": 13, "gauge_min": 80, "gauge_max": 140},
+    '장어': {"catch_level": 14, "gauge_min": 80, "gauge_max": 140},
+    '대구': {"catch_level": 18, "gauge_min": 80, "gauge_max": 140},
+    '복어': {"catch_level": 14, "gauge_min": 80, "gauge_max": 140},
+    '민어': {"catch_level": 18, "gauge_min": 80, "gauge_max": 140},
+    '참치': {"catch_level": 21, "gauge_min": 120, "gauge_max": 210},
+    '무지개송어': {"catch_level": 14, "gauge_min": 80, "gauge_max": 140},
+    '아귀': {"catch_level": 17, "gauge_min": 80, "gauge_max": 140},
+    '비단잉어': {"catch_level": 18, "gauge_min": 80, "gauge_max": 140},
+    '철갑상어': {"catch_level": 27, "gauge_min": 120, "gauge_max": 210},
+    '다금바리': {"catch_level": 22, "gauge_min": 120, "gauge_max": 210},
+    '얼음 송어': {"catch_level": 24, "gauge_min": 120, "gauge_max": 210},
+    '그림자 메기': {"catch_level": 36, "gauge_min": 180, "gauge_max": 320},
+    '전기 뱀장어': {"catch_level": 37, "gauge_min": 180, "gauge_max": 320},
+    '별빛 해파리': {"catch_level": 50, "gauge_min": 180, "gauge_max": 320},
+    '무지개 고래어': {"catch_level": 107, "gauge_min": 650, "gauge_max": 1100},
+    '심연의 포식어': {"catch_level": 108, "gauge_min": 650, "gauge_max": 1100},
+    '아카브 심해종': {"catch_level": 109, "gauge_min": 650, "gauge_max": 1100},
+    '심해룡': {"catch_level": 111, "gauge_min": 650, "gauge_max": 1100},
+    '심연 크라운': {"catch_level": 112, "gauge_min": 650, "gauge_max": 1100},
+    '공허의 포식자': {"catch_level": 120, "gauge_min": 650, "gauge_max": 1100},
+    '메갈로돈': {"catch_level": 113, "gauge_min": 650, "gauge_max": 1100},
+    '크라켄': {"catch_level": 110, "gauge_min": 650, "gauge_max": 1100},
+}
+
+for _fish_name, _setting in FISH_CATCH_SETTINGS.items():
+    if _fish_name in FISH_DATA:
+        FISH_DATA[_fish_name].update(_setting)
+
+
+def get_fish_description(fish_name):
+    desc = FISH_DESCRIPTIONS.get(fish_name, "")
+    return desc if desc else "설명 준비 중..."
+
+
+def fish_detail_text(fish_name, user_id=None):
+    update_fish_market()
+    data = FISH_DATA[fish_name]
+    caught_text = ""
+    if user_id is not None:
+        dex = fish_dex.get(user_id, set())
+        caught_text = "✅ 등록됨" if fish_name in dex else "❌ 미등록"
+        caught_text = f"도감 상태: **{caught_text}**\n"
+
+    chance = data.get("chance", 0)
+    shown_chance = chance * 2 if globals().get("_FISH_CHANCE_HALVED", False) else chance
+
+    return (
+        f"📖🐟 **{fish_name} 정보**\n\n"
+        f"{caught_text}"
+        f"이름: **{fish_name}**\n"
+        f"최대 무게: **{data['max_kg']}kg**\n"
+        f"포획 레벨: **{data.get('catch_level', 1)}**\n"
+        f"힘겨루기 게이지: **{data.get('gauge_min', 100)}~{data.get('gauge_max', 100)}**\n"
+        f"확률 가중치: **{shown_chance}**\n"
+        f"기본 판매가: **{money(data['base_price'])}**\n"
+        f"kg당 추가 가격: **{money(data['kg_price'])}**\n"
+        f"{get_market_text(fish_name)}\n"
+        f"장소: **{data['habitat']}**\n\n"
+        f"설명: {get_fish_description(fish_name)}"
+    )
 
 BOSS_FISH = ["메갈로돈", "크라켄"]
 
@@ -1944,6 +2167,7 @@ class FishBattleView(discord.ui.View):
                     f"사용 낚싯대: **{self.rod_name}**\n"
                     f"사용 미끼: **{self.bait_name}**\n\n"
                     + "\n\n".join(caught_text)
+                    + chest_text
                     + "\n\n📦 뭔가 귀중품 같다...\n"
                     f"**{lost_item['display_name']}**의 주인을 찾을까?"
                 ),
@@ -1958,6 +2182,7 @@ class FishBattleView(discord.ui.View):
                 f"사용 낚싯대: **{self.rod_name}**\n"
                 f"사용 미끼: **{self.bait_name}**\n\n"
                 + "\n\n".join(caught_text)
+                + chest_text
             ),
             view=None
         )
@@ -2293,14 +2518,11 @@ async def fishing_success(interaction: discord.Interaction):
         bonus_text = "\n🔥 **더블 낚시 발동!**"
 
     main_fish = fish_list[0]
-    chance = FISH_DATA[main_fish]["chance"]
-
-    if chance <= 1:
-        max_gauge = random.randint(270, 470)
-    elif chance <= 5:
-        max_gauge = random.randint(120, 250)
-    else:
-        max_gauge = 100
+    main_fish_data = FISH_DATA[main_fish]
+    max_gauge = random.randint(
+        int(main_fish_data.get("gauge_min", 100)),
+        int(main_fish_data.get("gauge_max", 100))
+    )
 
     view = FishBattleView(user_id, fish_list, rod_name, bait_name, max_gauge)
 
@@ -2715,45 +2937,205 @@ async def sell_all_items(interaction: discord.Interaction):
     )
 
 
-@bot.tree.command(name="도감", description="내가 잡아본 물고기 도감 확인", guild=GUILD)
+
+FISH_DEX_PAGE_SIZE = 8
+
+
+class FishDexJumpModal(discord.ui.Modal, title="도감 페이지 이동"):
+    page = discord.ui.TextInput(label="이동할 페이지 번호", placeholder="예: 3", required=True, max_length=4)
+
+    def __init__(self, dex_view):
+        super().__init__()
+        self.dex_view = dex_view
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if interaction.user.id != self.dex_view.user_id:
+            await interaction.response.send_message("❌ 니 도감 아님.", ephemeral=True)
+            return
+
+        try:
+            page_num = int(str(self.page.value).strip())
+        except ValueError:
+            await interaction.response.send_message("❌ 숫자로 입력해야 함.", ephemeral=True)
+            return
+
+        self.dex_view.page = max(0, min(self.dex_view.max_page - 1, page_num - 1))
+        self.dex_view.mode = "list"
+        self.dex_view.selected_fish = None
+        self.dex_view.refresh_items()
+        await interaction.response.edit_message(content=self.dex_view.render(), view=self.dex_view)
+
+
+class FishDexNavButton(discord.ui.Button):
+    def __init__(self, label, action):
+        super().__init__(label=label, style=discord.ButtonStyle.gray, row=4)
+        self.action = action
+
+    async def callback(self, interaction: discord.Interaction):
+        view: FishDexView = self.view
+        if interaction.user.id != view.user_id:
+            await interaction.response.send_message("❌ 니 도감 아님.", ephemeral=True)
+            return
+
+        if self.action == "prev":
+            view.page = max(0, view.page - 1)
+        elif self.action == "next":
+            view.page = min(view.max_page - 1, view.page + 1)
+        elif self.action == "jump":
+            await interaction.response.send_modal(FishDexJumpModal(view))
+            return
+        elif self.action == "back":
+            view.mode = "list"
+            view.selected_fish = None
+
+        view.refresh_items()
+        await interaction.response.edit_message(content=view.render(), view=view)
+
+
+class FishDexFishButton(discord.ui.Button):
+    def __init__(self, fish_name, caught, row):
+        emoji = "✅" if caught else "❌"
+        super().__init__(label=fish_name, emoji=emoji, style=discord.ButtonStyle.secondary, row=row)
+        self.fish_name = fish_name
+
+    async def callback(self, interaction: discord.Interaction):
+        view: FishDexView = self.view
+        if interaction.user.id != view.user_id:
+            await interaction.response.send_message("❌ 니 도감 아님.", ephemeral=True)
+            return
+
+        view.mode = "detail"
+        view.selected_fish = self.fish_name
+        view.refresh_items()
+        await interaction.response.edit_message(content=view.render(), view=view)
+
+
+class FishDexView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=180)
+        self.user_id = user_id
+        self.page = 0
+        self.mode = "list"
+        self.selected_fish = None
+        self.fish_names = list(FISH_DATA.keys())
+        self.max_page = max(1, (len(self.fish_names) + FISH_DEX_PAGE_SIZE - 1) // FISH_DEX_PAGE_SIZE)
+        self.refresh_items()
+
+    def user_dex(self):
+        return fish_dex.get(self.user_id, set())
+
+    def refresh_items(self):
+        self.clear_items()
+
+        if self.mode == "detail" and self.selected_fish:
+            self.add_item(FishDexNavButton("뒤로가기", "back"))
+            return
+
+        start = self.page * FISH_DEX_PAGE_SIZE
+        current = self.fish_names[start:start + FISH_DEX_PAGE_SIZE]
+        dex = self.user_dex()
+
+        for i, fish_name in enumerate(current):
+            self.add_item(FishDexFishButton(fish_name, fish_name in dex, row=i // 2))
+
+        prev_button = FishDexNavButton("<", "prev")
+        page_button = FishDexNavButton(f"{self.page + 1}/{self.max_page}", "jump")
+        next_button = FishDexNavButton(">", "next")
+
+        prev_button.disabled = self.page <= 0
+        next_button.disabled = self.page >= self.max_page - 1
+
+        self.add_item(prev_button)
+        self.add_item(page_button)
+        self.add_item(next_button)
+
+    def render(self):
+        dex = self.user_dex()
+
+        if self.mode == "detail" and self.selected_fish:
+            return fish_detail_text(self.selected_fish, self.user_id)
+
+        start = self.page * FISH_DEX_PAGE_SIZE
+        current = self.fish_names[start:start + FISH_DEX_PAGE_SIZE]
+        lines = []
+        for fish_name in current:
+            mark = "✅" if fish_name in dex else "❌"
+            data = FISH_DATA[fish_name]
+            lines.append(f"{mark} **{fish_name}** (포획 레벨: {data.get('catch_level', 1)}) | {data['habitat']}")
+
+        return (
+            f"📖 **물고기 도감**\n"
+            f"등록: **{len(dex)}/{len(self.fish_names)}종**\n"
+            f"페이지: **< {self.page + 1}/{self.max_page} >**\n\n"
+            + "\n".join(lines)
+            + "\n\n아래 물고기 버튼을 누르면 위키처럼 자세한 정보가 뜸."
+        )
+
+
+@bot.tree.command(name="도감", description="물고기 도감을 페이지로 확인한다", guild=GUILD)
 async def fish_book(interaction: discord.Interaction):
     user_id = interaction.user.id
     get_tank(user_id)
+    update_fish_market()
 
-    if not fish_dex[user_id]:
-        await interaction.response.send_message("📖 아직 도감에 등록된 물고기가 없음.")
-        return
-
-    text = "\n".join(
-        f"✅ {fish_name}"
-        for fish_name in fish_dex[user_id]
-    )
-
-    await interaction.response.send_message(
-        f"📖 **물고기 도감**\n\n{text}"
-    )
+    view = FishDexView(user_id)
+    await interaction.response.send_message(view.render(), view=view)
 
 
 @bot.tree.command(name="물고기정보", description="물고기 정보를 확인한다", guild=GUILD)
 @app_commands.describe(물고기="정보를 볼 물고기 이름")
 async def fish_info(interaction: discord.Interaction, 물고기: str):
-    update_fish_market()
-
     if 물고기 not in FISH_DATA:
         await interaction.response.send_message("❌ 그런 물고기는 없음.", ephemeral=True)
         return
 
-    data = FISH_DATA[물고기]
+    await interaction.response.send_message(fish_detail_text(물고기, interaction.user.id))
+
+
+@bot.tree.command(name="아이템뽑기", description="돈을 써서 제작 재료 상자를 뽑는다", guild=GUILD)
+@app_commands.describe(횟수="뽑기 횟수")
+async def item_gacha(interaction: discord.Interaction, 횟수: int = 1):
+    user_id = interaction.user.id
+    get_wallet(user_id)
+    get_item_bag(user_id)
+
+    if 횟수 <= 0:
+        await interaction.response.send_message("❌ 1회 이상 뽑아야 함.", ephemeral=True)
+        return
+
+    if 횟수 > 100:
+        await interaction.response.send_message("❌ 한 번에 최대 100회까지만 가능.", ephemeral=True)
+        return
+
+    total_price = GACHA_PRICE * 횟수
+
+    if money_data[user_id] < total_price:
+        await interaction.response.send_message(
+            f"❌ 돈 부족.\n필요 금액: **{money(total_price)}**\n현재 잔액: **{money(money_data[user_id])}**",
+            ephemeral=True
+        )
+        return
+
+    money_data[user_id] -= total_price
+
+    results = {}
+    for _ in range(횟수):
+        chest_name = roll_gacha_chest()
+        add_item(user_id, chest_name, 1)
+        results[chest_name] = results.get(chest_name, 0) + 1
+
+    save_data()
+
+    result_text = "\n".join(f"📦 **{name}** x{count}" for name, count in results.items())
 
     await interaction.response.send_message(
-        f"🐟 **{물고기} 정보**\n\n"
-        f"무게 범위: **{data['min_kg']}kg ~ {data['max_kg']}kg**\n"
-        f"서식지: **{data['habitat']}**\n"
-        f"기본 판매가격: **{money(data['base_price'])}**\n"
-        f"kg당 추가 가격: **{money(data['kg_price'])}**\n"
-        f"{get_market_text(물고기)}\n\n"
-        f"판매가 계산식:\n"
-        f"`기본 가격 + kg × kg당 가격 × 현재 시세`"
+        f"🎰 **아이템 뽑기 완료!**\n\n"
+        f"횟수: **{횟수}회**\n"
+        f"사용 금액: **{money(total_price)}**\n\n"
+        f"획득:\n{result_text}\n\n"
+        f"확률표:\n{gacha_rate_text()}\n\n"
+        f"현재 잔액: **{money(money_data[user_id])}**\n"
+        f"상자는 `/상자열기 상자이름 갯수`로 열면 됨."
     )
 
 
