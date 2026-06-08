@@ -2537,6 +2537,90 @@ async def fishing_success(interaction: discord.Interaction):
     view.message = await interaction.original_response()
     asyncio.create_task(view.start_battle())
 
+GACHA_CHESTS = {
+    "낡은 재료 상자": 60,
+    "평범한 재료 상자": 25,
+    "고급 재료 상자": 10,
+    "희귀 재료 상자": 4,
+    "전설 재료 상자": 1,
+}
+
+async def chest_autocomplete(
+    interaction: discord.Interaction,
+    current: str
+):
+    user_id = interaction.user.id
+    get_item_bag(user_id)
+
+    owned_chests = [
+        name for name, count in item_bag[user_id].items()
+        if count > 0 and name in GACHA_CHESTS
+    ]
+
+    results = [
+        app_commands.Choice(
+            name=f"{name} x{item_bag[user_id][name]}",
+            value=name
+        )
+        for name in owned_chests
+        if current.lower() in name.lower()
+    ]
+
+    return results[:25]
+    
+# =========================
+# 뽑기 천장 설정
+# =========================
+
+PITY_LIMIT = 50
+PITY_CHEST = "전설 재료 상자"
+
+if "gacha_pity" not in globals():
+    gacha_pity = {}
+
+def get_gacha_pity(user_id):
+    user_id = str(user_id)
+
+    if user_id not in gacha_pity:
+        gacha_pity[user_id] = 0
+
+    return gacha_pity[user_id]
+
+
+def roll_gacha_chest_with_pity(user_id):
+    user_id = str(user_id)
+
+    if user_id not in gacha_pity:
+        gacha_pity[user_id] = 0
+
+    gacha_pity[user_id] += 1
+
+    # 천장
+    if gacha_pity[user_id] >= PITY_LIMIT:
+        gacha_pity[user_id] = 0
+        return PITY_CHEST
+
+    chest_name = roll_gacha_chest()
+
+    # 전설 상자 뜨면 천장 초기화
+    if chest_name == PITY_CHEST:
+        gacha_pity[user_id] = 0
+
+    return chest_name
+
+
+# =========================
+# 뽑기 횟수 선택지
+# =========================
+
+GACHA_COUNT_CHOICES = [
+    app_commands.Choice(name="1회", value=1),
+    app_commands.Choice(name="10회", value=10),
+    app_commands.Choice(name="30회", value=30),
+    app_commands.Choice(name="50회", value=50),
+    app_commands.Choice(name="100회", value=100),
+]
+
 
 # =========================
 # 명령어
@@ -2777,7 +2861,7 @@ async def sell_all_fish(interaction: discord.Interaction):
 
 
 
-@bot.tree.command(name="아이템", description="보유한 제작 재료와 상자를 확인한다", guild=GUILD)
+@bot.tree.command(name="가방", description="보유한 제작 재료와 상자를 확인한다", guild=GUILD)
 async def my_items(interaction: discord.Interaction):
     user_id = interaction.user.id
     get_item_bag(user_id)
@@ -2813,47 +2897,53 @@ async def my_items(interaction: discord.Interaction):
     await interaction.response.send_message("📄 아이템 목록이 길어서 txt 파일로 뽑았음.", file=file)
 
 
-@bot.tree.command(name="상자열기", description="상자를 열어서 제작 재료를 얻는다", guild=GUILD)
-@app_commands.describe(상자="열 상자 이름", 갯수="열 갯수")
+@bot.tree.command(name="상자열기", description="보유한 재료 상자를 연다", guild=GUILD)
+@app_commands.describe(
+    상자="열 상자를 선택하세요",
+    갯수="열 갯수"
+)
+@app_commands.autocomplete(상자=chest_autocomplete)
 async def open_chest(interaction: discord.Interaction, 상자: str, 갯수: int = 1):
     user_id = interaction.user.id
     get_item_bag(user_id)
-
-    if 상자 not in CHEST_DROP_TABLE:
-        await interaction.response.send_message("❌ 그런 상자는 없음.", ephemeral=True)
-        return
 
     if 갯수 <= 0:
         await interaction.response.send_message("❌ 1개 이상 열어야 함.", ephemeral=True)
         return
 
-    have = get_item_count(user_id, 상자)
-    if have < 갯수:
+    if 상자 not in GACHA_CHESTS:
+        await interaction.response.send_message("❌ 존재하지 않는 상자임.", ephemeral=True)
+        return
+
+    if item_bag[user_id].get(상자, 0) < 갯수:
         await interaction.response.send_message(
-            f"❌ 상자 부족함.\n보유: **{have}개**",
+            f"❌ 상자가 부족함.\n보유: **{item_bag[user_id].get(상자, 0)}개**",
             ephemeral=True
         )
         return
 
-    results = {}
+    item_bag[user_id][상자] -= 갯수
 
+    rewards = {}
     for _ in range(갯수):
-        item_name = open_chest_once(user_id, 상자)
-        if item_name is None:
-            break
-        results[item_name] = results.get(item_name, 0) + 1
+        reward_items = open_gacha_chest(상자)
+
+        for item_name, amount in reward_items.items():
+            add_item(user_id, item_name, amount)
+            rewards[item_name] = rewards.get(item_name, 0) + amount
 
     save_data()
 
-    result_text = "\n".join(
-        f"**{name}** x{count}"
-        for name, count in results.items()
+    reward_text = "\n".join(
+        f"🧩 **{name}** x{amount}"
+        for name, amount in rewards.items()
     )
 
     await interaction.response.send_message(
         f"📦 **상자 개봉 완료!**\n\n"
-        f"개봉 상자: **{상자} x{갯수}개**\n\n"
-        f"획득:\n{result_text}"
+        f"상자: **{상자}**\n"
+        f"개봉 수: **{갯수}개**\n\n"
+        f"획득:\n{reward_text}"
     )
 
 
@@ -3092,26 +3182,25 @@ async def fish_info(interaction: discord.Interaction, 물고기: str):
     await interaction.response.send_message(fish_detail_text(물고기, interaction.user.id))
 
 
-@bot.tree.command(name="아이템뽑기", description="돈을 써서 제작 재료 상자를 뽑는다", guild=GUILD)
+@bot.tree.command(name="뽑기", description="돈을 써서 제작 재료 상자를 뽑는다", guild=GUILD)
 @app_commands.describe(횟수="뽑기 횟수")
-async def item_gacha(interaction: discord.Interaction, 횟수: int = 1):
+@app_commands.choices(횟수=GACHA_COUNT_CHOICES)
+async def item_gacha(
+    interaction: discord.Interaction,
+    횟수: int = 1
+):
     user_id = interaction.user.id
+
     get_wallet(user_id)
     get_item_bag(user_id)
-
-    if 횟수 <= 0:
-        await interaction.response.send_message("❌ 1회 이상 뽑아야 함.", ephemeral=True)
-        return
-
-    if 횟수 > 100:
-        await interaction.response.send_message("❌ 한 번에 최대 100회까지만 가능.", ephemeral=True)
-        return
 
     total_price = GACHA_PRICE * 횟수
 
     if money_data[user_id] < total_price:
         await interaction.response.send_message(
-            f"❌ 돈 부족.\n필요 금액: **{money(total_price)}**\n현재 잔액: **{money(money_data[user_id])}**",
+            f"❌ 돈 부족.\n"
+            f"필요 금액: **{money(total_price)}**\n"
+            f"현재 잔액: **{money(money_data[user_id])}**",
             ephemeral=True
         )
         return
@@ -3119,25 +3208,41 @@ async def item_gacha(interaction: discord.Interaction, 횟수: int = 1):
     money_data[user_id] -= total_price
 
     results = {}
+    pity_hit = 0
+
     for _ in range(횟수):
-        chest_name = roll_gacha_chest()
+        chest_name = roll_gacha_chest_with_pity(user_id)
+
+        if chest_name == PITY_CHEST:
+            pity_hit += 1
+
         add_item(user_id, chest_name, 1)
+
         results[chest_name] = results.get(chest_name, 0) + 1
 
     save_data()
 
-    result_text = "\n".join(f"📦 **{name}** x{count}" for name, count in results.items())
+    result_text = "\n".join(
+        f"📦 **{name}** x{count}"
+        for name, count in sorted(results.items())
+    )
 
-    await interaction.response.send_message(
+    current_pity = get_gacha_pity(user_id)
+
+    msg = (
         f"🎰 **아이템 뽑기 완료!**\n\n"
         f"횟수: **{횟수}회**\n"
         f"사용 금액: **{money(total_price)}**\n\n"
         f"획득:\n{result_text}\n\n"
-        f"확률표:\n{gacha_rate_text()}\n\n"
-        f"현재 잔액: **{money(money_data[user_id])}**\n"
-        f"상자는 `/상자열기 상자이름 갯수`로 열면 됨."
+        f"📈 천장 진행도: **{current_pity}/{PITY_LIMIT}**\n"
+        f"💰 현재 잔액: **{money(money_data[user_id])}**\n\n"
+        f"상자는 `/상자열기` 로 열 수 있음."
     )
 
+    if pity_hit > 0:
+        msg += f"\n\n🔥 천장 발동 횟수: **{pity_hit}회**"
+
+    await interaction.response.send_message(msg)
 
 @bot.tree.command(name="어시장", description="현재 물고기 시세를 확인한다", guild=GUILD)
 async def fish_market_command(interaction: discord.Interaction):
