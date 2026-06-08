@@ -2545,28 +2545,37 @@ GACHA_CHESTS = {
     "전설 재료 상자": 1,
 }
 
-async def chest_autocomplete(
-    interaction: discord.Interaction,
-    current: str
-):
-    user_id = interaction.user.id
-    get_item_bag(user_id)
+async def chest_autocomplete(interaction: discord.Interaction, current: str):
+    try:
+        user_id = interaction.user.id
+        get_item_bag(user_id)
 
-    owned_chests = [
-        name for name, count in item_bag[user_id].items()
-        if count > 0 and name in GACHA_CHESTS
-    ]
+        bag = item_bag.get(user_id, {})
 
-    results = [
-        app_commands.Choice(
-            name=f"{name} x{item_bag[user_id][name]}",
-            value=name
-        )
-        for name in owned_chests
-        if current.lower() in name.lower()
-    ]
+        choices = []
 
-    return results[:25]
+        for item_name, count in bag.items():
+            if count <= 0:
+                continue
+
+            if "상자" not in item_name:
+                continue
+
+            if current and current not in item_name:
+                continue
+
+            choices.append(
+                app_commands.Choice(
+                    name=f"{item_name} x{count}",
+                    value=item_name
+                )
+            )
+
+        return choices[:25]
+
+    except Exception as e:
+        print(f"[상자 자동완성 오류] {repr(e)}")
+        return []
     
 # =========================
 # 뽑기 천장 설정
@@ -2627,7 +2636,7 @@ GACHA_COUNT_CHOICES = [
 
 async def chest_autocomplete(interaction: discord.Interaction, current: str):
     try:
-        user_id = str(interaction.user.id)
+        user_id = interaction.user.id
         get_item_bag(user_id)
 
         bag = item_bag.get(user_id, {})
@@ -2654,18 +2663,16 @@ async def chest_autocomplete(interaction: discord.Interaction, current: str):
         return choices[:25]
 
     except Exception as e:
-        print(f"[상자 자동완성 오류] {e}")
+        print(f"[상자 자동완성 오류] {repr(e)}")
         return []
-
 
 # =========================
 # 갯수 자동완성
-# 상자를 고른 뒤에만 뜸
 # =========================
 
 async def chest_count_autocomplete(interaction: discord.Interaction, current: str):
     try:
-        user_id = str(interaction.user.id)
+        user_id = interaction.user.id
         get_item_bag(user_id)
 
         selected_chest = getattr(interaction.namespace, "상자", None)
@@ -2678,19 +2685,15 @@ async def chest_count_autocomplete(interaction: discord.Interaction, current: st
         if owned_count <= 0:
             return []
 
-        base_counts = [1, 5, 10, 30, 50, 100]
-        possible_counts = []
+        counts = [1, 5, 10, 30, 50, 100]
+        counts = [c for c in counts if c <= owned_count]
 
-        for count in base_counts:
-            if count <= owned_count:
-                possible_counts.append(count)
-
-        if owned_count not in possible_counts:
-            possible_counts.append(owned_count)
+        if owned_count not in counts:
+            counts.append(owned_count)
 
         choices = []
 
-        for count in possible_counts:
+        for count in counts:
             text = str(count)
 
             if current and current not in text:
@@ -2706,9 +2709,8 @@ async def chest_count_autocomplete(interaction: discord.Interaction, current: st
         return choices[:25]
 
     except Exception as e:
-        print(f"[상자 갯수 자동완성 오류] {e}")
+        print(f"[상자 갯수 자동완성 오류] {repr(e)}")
         return []
-
 
 # =========================
 # 명령어
