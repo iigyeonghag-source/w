@@ -3849,16 +3849,52 @@ def add_furina_mora(user_id, amount):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
-mora = 금액 // MORA_RATE
-used_money = mora * MORA_RATE
+@bot.tree.command(name="모라송금", description="오브 돈을 모라로 환전", guild=GUILD)
+@app_commands.describe(금액="환전할 금액")
+async def mora_transfer(interaction: discord.Interaction, 금액: int):
+    uid = str(interaction.user.id)
+    now = datetime.now()
 
-remove_maro(uid, used_money)
-add_furina_mora(uid, mora)
+    last = exchange_cooldowns.get(uid)
+    if last:
+        remain = EXCHANGE_COOLDOWN - (now - last)
+        if remain.total_seconds() > 0:
+            hours = int(remain.total_seconds() // 3600)
+            minutes = int((remain.total_seconds() % 3600) // 60)
 
-await interaction.response.send_message(
-    f"💱 {money(used_money)} → **{mora:,}모라** 송금 완료!"
-)
+            await interaction.response.send_message(
+                f"❌ 모라 송금 쿨타임 남음!\n⏳ {hours}시간 {minutes}분 후 가능",
+                ephemeral=True
+            )
+            return
 
+    if 금액 < MORA_RATE:
+        await interaction.response.send_message(
+            "❌ 최소 100원부터 환전 가능.",
+            ephemeral=True
+        )
+        return
+
+    wallet = get_wallet(uid)
+
+    if wallet < 금액:
+        await interaction.response.send_message(
+            f"❌ 돈 부족. 현재 잔액: {money(wallet)}",
+            ephemeral=True
+        )
+        return
+
+    mora = 금액 // MORA_RATE
+    used_money = mora * MORA_RATE
+
+    remove_maro(uid, used_money)
+    add_furina_mora(uid, mora)
+
+    exchange_cooldowns[uid] = now
+
+    await interaction.response.send_message(
+        f"💱 {money(used_money)} → **{mora:,}모라** 송금 완료!"
+    )
 
 @bot.event
 async def on_ready():
