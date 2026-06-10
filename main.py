@@ -3821,6 +3821,55 @@ async def reset_fish_market_error(
             ephemeral=True
         )
 
+MORA_RATE = 100
+
+@bot.tree.command(name="모라송금", description="오브 돈을 모라로 환전")
+@app_commands.describe(금액="환전할 금액")
+async def mora_transfer(interaction: discord.Interaction, 금액: int):
+
+    uid = str(interaction.user.id)
+
+    if 금액 < 100:
+        await interaction.response.send_message(
+            "❌ 최소 100원부터 환전 가능.",
+            ephemeral=True
+        )
+        return
+
+    wallet = get_wallet(uid)
+
+    if wallet < 금액:
+        await interaction.response.send_message(
+            f"❌ 돈 부족. 현재 잔액: {money(wallet)}",
+            ephemeral=True
+        )
+        return
+
+    mora = 금액 // MORA_RATE
+    used_money = mora * MORA_RATE
+
+    remove_maro(uid, used_money)
+
+    # 환전 대기 파일
+    os.makedirs("/data/mora_exchange", exist_ok=True)
+
+    exchange_data = {
+        "user_id": uid,
+        "mora": mora
+    }
+
+    with open(
+        f"/data/mora_exchange/{uid}.json",
+        "w",
+        encoding="utf-8"
+    ) as f:
+        json.dump(exchange_data, f)
+
+    await interaction.response.send_message(
+        f"💱 {money(used_money)} → {mora:,}모라 환전 완료!\n"
+        f"이제 푸리나 봇에서 `/모라수령` 을 사용해."
+    )
+    
 @bot.event
 async def on_ready():
     await bot.tree.sync(guild=GUILD)
