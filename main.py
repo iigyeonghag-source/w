@@ -3821,74 +3821,45 @@ async def reset_fish_market_error(
             ephemeral=True
         )
 
-MORA_RATE = 100
 exchange_cooldowns = {}
 EXCHANGE_COOLDOWN = timedelta(hours=12)
 
-@bot.tree.command(name="모라송금", description="오브 돈을 모라로 환전", guild=GUILD)
-@app_commands.describe(금액="환전할 금액")
-async def mora_transfer(interaction: discord.Interaction, 금액: int):
+FURINA_DATA_FILE = "/data/data.json"
+MORA_RATE = 100
 
-    uid = str(interaction.user.id)
-    now = datetime.now()
+def add_furina_mora(user_id, amount):
+    uid = str(user_id)
 
-    last = exchange_cooldowns.get(uid)
+    if not os.path.exists(FURINA_DATA_FILE):
+        data = {
+            "poker_money": {},
+            "poker_last_claim": {},
+            "favor": {},
+            "memory": {},
+            "characters": {}
+        }
+    else:
+        with open(FURINA_DATA_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
 
-    if last:
-        remain = EXCHANGE_COOLDOWN - (now - last)
+    data.setdefault("poker_money", {})
+    data["poker_money"][uid] = int(data["poker_money"].get(uid, 0)) + int(amount)
 
-        if remain.total_seconds() > 0:
-            hours = int(remain.total_seconds() // 3600)
-            minutes = int((remain.total_seconds() % 3600) // 60)
+    with open(FURINA_DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
 
-            await interaction.response.send_message(
-                f"❌ 환전 쿨타임 남음!\n"
-                f"⏳ {hours}시간 {minutes}분 후 가능",
-                ephemeral=True
-            )
-            return
-    if 금액 < 100:
-        await interaction.response.send_message(
-            "❌ 최소 100원부터 환전 가능.",
-            ephemeral=True
-        )
-        return
 
-    wallet = get_wallet(uid)
+mora = 금액 // MORA_RATE
+used_money = mora * MORA_RATE
 
-    if wallet < 금액:
-        await interaction.response.send_message(
-            f"❌ 돈 부족. 현재 잔액: {money(wallet)}",
-            ephemeral=True
-        )
-        return
+remove_maro(uid, used_money)
+add_furina_mora(uid, mora)
 
-    mora = 금액 // MORA_RATE
-    used_money = mora * MORA_RATE
+await interaction.response.send_message(
+    f"💱 {money(used_money)} → **{mora:,}모라** 송금 완료!"
+)
 
-    remove_maro(uid, used_money)
 
-    # 환전 대기 파일
-    os.makedirs("/data/mora_exchange", exist_ok=True)
-
-    exchange_data = {
-        "user_id": uid,
-        "mora": mora
-    }
-
-    with open(
-        f"/data/mora_exchange/{uid}.json",
-        "w",
-        encoding="utf-8"
-    ) as f:
-        json.dump(exchange_data, f)
-        
-    exchange_cooldowns[uid] = now
-    await interaction.response.send_message(
-        f"💱 {money(used_money)} → {mora:,}모라 환전 완료!\n"
-        f"이제 푸리나 봇에서 `/모라수령` 을 사용해."
-    )
-    
 @bot.event
 async def on_ready():
     await bot.tree.sync(guild=GUILD)
