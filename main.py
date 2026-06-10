@@ -3822,13 +3822,31 @@ async def reset_fish_market_error(
         )
 
 MORA_RATE = 100
+exchange_cooldowns = {}
+EXCHANGE_COOLDOWN = timedelta(hours=12)
 
 @bot.tree.command(name="모라송금", description="오브 돈을 모라로 환전", guild=GUILD)
 @app_commands.describe(금액="환전할 금액")
 async def mora_transfer(interaction: discord.Interaction, 금액: int):
 
     uid = str(interaction.user.id)
+    now = datetime.now()
 
+    last = exchange_cooldowns.get(uid)
+
+    if last:
+        remain = EXCHANGE_COOLDOWN - (now - last)
+
+        if remain.total_seconds() > 0:
+            hours = int(remain.total_seconds() // 3600)
+            minutes = int((remain.total_seconds() % 3600) // 60)
+
+            await interaction.response.send_message(
+                f"❌ 환전 쿨타임 남음!\n"
+                f"⏳ {hours}시간 {minutes}분 후 가능",
+                ephemeral=True
+            )
+            return
     if 금액 < 100:
         await interaction.response.send_message(
             "❌ 최소 100원부터 환전 가능.",
@@ -3864,7 +3882,8 @@ async def mora_transfer(interaction: discord.Interaction, 금액: int):
         encoding="utf-8"
     ) as f:
         json.dump(exchange_data, f)
-
+        
+    exchange_cooldowns[uid] = now
     await interaction.response.send_message(
         f"💱 {money(used_money)} → {mora:,}모라 환전 완료!\n"
         f"이제 푸리나 봇에서 `/모라수령` 을 사용해."
