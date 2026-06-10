@@ -3823,7 +3823,7 @@ async def reset_fish_market_error(
 
 MORA_RATE = 100
 
-@bot.tree.command(name="모라송금", description="오브 돈을 모라로 환전")
+@bot.tree.command(name="모라송금", description="오브 돈을 모라로 환전", guild=GUILD)
 @app_commands.describe(금액="환전할 금액")
 async def mora_transfer(interaction: discord.Interaction, 금액: int):
 
