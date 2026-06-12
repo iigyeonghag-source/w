@@ -8,6 +8,7 @@ import os
 from dotenv import load_dotenv
 from io import BytesIO
 from datetime import datetime, timedelta
+from discord.errors import NotFound
 
 load_dotenv()
 
@@ -1867,6 +1868,25 @@ def fishing_result_embed(fish_list, rod_name, bait_name, chest_name=None, boss=F
 # 기본 낚시 타이밍 버튼
 # =========================
 
+# =========================
+# 안전 메시지 수정 함수
+# =========================
+
+async def safe_edit_message(message, **kwargs):
+    if message is None:
+        return False
+
+    try:
+        await message.edit(**kwargs)
+        return True
+    except (discord.NotFound, discord.HTTPException):
+        return False
+
+
+# =========================
+# 기본 낚시 타이밍 버튼
+# =========================
+
 class FishingButtonView(discord.ui.View):
     def __init__(self, user_id):
         super().__init__(timeout=35)
@@ -1874,6 +1894,7 @@ class FishingButtonView(discord.ui.View):
         self.message = None
         self.started = False
         self.done = False
+        self._ended = False
 
         self.ready_button = discord.ui.Button(
             label="기다리는 중...",
@@ -1887,25 +1908,34 @@ class FishingButtonView(discord.ui.View):
             await interaction.response.send_message("❌ 니 낚싯대 아님.", ephemeral=True)
             return
 
+        if self._ended:
+            await interaction.response.defer()
+            return
+
         if not self.started or self.ready_button.label != "지금이다!":
             self.done = True
+            self._ended = True
 
             for item in self.children:
                 item.disabled = True
 
-            await interaction.response.edit_message(
-                content=None,
-                embed=fishing_fail_embed(
-                    "🐟 물고기 도주",
-                    "너무 성급하게 낚싯대를 당겨버렸다...\n물고기가 도망갔다."
-                ),
-                view=self
-            )
+            try:
+                await interaction.response.edit_message(
+                    content=None,
+                    embed=fishing_fail_embed(
+                        "🐟 물고기 도주",
+                        "너무 성급하게 낚싯대를 당겨버렸다...\n물고기가 도망갔다."
+                    ),
+                    view=self
+                )
+            except (discord.NotFound, discord.HTTPException):
+                pass
 
             self.stop()
             return
 
         self.done = True
+        self._ended = True
         await fishing_success(interaction)
         self.stop()
 
@@ -1919,7 +1949,7 @@ class FishingButtonView(discord.ui.View):
         elapsed = 0
 
         while elapsed < wait_time:
-            if self.done:
+            if self.done or self._ended:
                 return
 
             if random.randint(1, 100) <= 25 and elapsed + 4 < wait_time:
@@ -1929,61 +1959,83 @@ class FishingButtonView(discord.ui.View):
                 self.ready_button.label = fake_start
                 self.ready_button.style = discord.ButtonStyle.red
 
-                await self.message.edit(
+                ok = await safe_edit_message(
+                    self.message,
                     content=None,
                     embed=fishing_wait_embed(fake_start),
                     view=self
                 )
+                if not ok:
+                    self._ended = True
+                    self.stop()
+                    return
+
                 await asyncio.sleep(3)
+
+                if self.done or self._ended:
+                    return
 
                 self.ready_button.label = "기다리는 중..."
                 self.ready_button.style = discord.ButtonStyle.gray
 
-                await self.message.edit(
+                ok = await safe_edit_message(
+                    self.message,
                     content=None,
                     embed=fishing_wait_embed(fake_end),
                     view=self
                 )
-                await asyncio.sleep(1)
+                if not ok:
+                    self._ended = True
+                    self.stop()
+                    return
 
+                await asyncio.sleep(1)
                 elapsed += 4
                 continue
 
-            await self.message.edit(
+            ok = await safe_edit_message(
+                self.message,
                 content=None,
                 embed=fishing_wait_embed(random.choice(FISH_WAIT_MESSAGES)),
                 view=self
             )
+            if not ok:
+                self._ended = True
+                self.stop()
+                return
 
             await asyncio.sleep(5)
             elapsed += 5
 
-        if self.done:
+        if self.done or self._ended:
             return
 
         self.started = True
         self.ready_button.label = "지금이다!"
         self.ready_button.style = discord.ButtonStyle.green
 
-        await self.message.edit(
+        await safe_edit_message(
+            self.message,
             content=None,
             embed=fishing_wait_embed("**지금이다!**\n초록 버튼을 눌러!"),
             view=self
         )
 
     async def on_timeout(self):
-        if self.done:
+        if self.done or self._ended:
             return
+
+        self._ended = True
 
         for item in self.children:
             item.disabled = True
 
-        if self.message:
-            await self.message.edit(
-                content=None,
-                embed=fishing_fail_embed("🐟 물고기 도주", "시간이 지나 물고기가 도망갔다..."),
-                view=self
-            )
+        await safe_edit_message(
+            self.message,
+            content=None,
+            embed=fishing_fail_embed("🐟 물고기 도주", "시간이 지나 물고기가 도망갔다..."),
+            view=self
+        )
 
 
 # =========================
@@ -2016,6 +2068,7 @@ class FishBattleView(discord.ui.View):
         self.force_move_next = False
         self.last_event_text = ""
         self.last_event_effect = ""
+        self._ended = False
 
         for i in range(5):
             self.add_item(FishGaugeButton(i))
@@ -2066,24 +2119,21 @@ class FishBattleView(discord.ui.View):
 
         if message in gauge_down_messages:
             self.gauge = max(0, self.gauge - self.gauge_step())
-            self.last_event_effect = "📉 물고기가 버텨서 게이지가 **1칸 감소**했다!"
+            self.last_event_effect = "📉 게이지가 **1칸 감소**했다!"
 
         elif message in gauge_up_messages:
             self.gauge = min(self.max_gauge, self.gauge + self.gauge_step())
-            self.last_event_effect = "📈 빈틈을 잡아서 게이지가 **1칸 증가**했다!"
+            self.last_event_effect = "📈 게이지가 **1칸 증가**했다!"
 
         elif message in trap_messages:
             self.force_trap_next = True
-            self.last_event_effect = "🟥 위험하다! 다음 박스에 **빨간 함정 칸**이 나온다!"
+            self.last_event_effect = "🟥 다음에 빨간 함정 칸이 나온다!"
 
         elif message in move_messages:
             self.force_move_next = True
-            self.last_event_effect = "🔄 놈이 날뛴다! 다음 초록 칸 위치가 한 번 더 바뀐다!"
+            self.last_event_effect = "🔄 다음 초록 칸 위치가 한 번 더 바뀐다!"
 
     async def start_battle(self):
-        await self.start_hit_round()
-
-    async def wait_for_chance(self):
         await self.start_hit_round()
 
     def setup_round_buttons(self):
@@ -2133,6 +2183,9 @@ class FishBattleView(discord.ui.View):
             self.children[self.gold_index].disabled = False
 
     async def start_hit_round(self):
+        if self._ended:
+            return
+
         self.round_active = True
         self.round_token += 1
         token = self.round_token
@@ -2142,7 +2195,7 @@ class FishBattleView(discord.ui.View):
         elapsed = 0
 
         while elapsed < total_time:
-            if not self.round_active or token != self.round_token:
+            if self._ended or not self.round_active or token != self.round_token:
                 return
 
             if self.gauge >= self.max_gauge:
@@ -2160,24 +2213,28 @@ class FishBattleView(discord.ui.View):
             self.setup_round_buttons()
 
             effect_text = f"\n{self.last_event_effect}" if self.last_event_effect else ""
-            gold_text = "\n🟨 황금 칸: 누르면 남은 타이밍 무시 + 게이지 2배 증가!" if self.gold_index is not None else ""
-            remaining = total_time - elapsed
+            gold_text = "\n🟨 황금 칸: 게이지 2배 증가!" if self.gold_index is not None else ""
 
-            await self.message.edit(
+            ok = await safe_edit_message(
+                self.message,
                 content=None,
                 embed=fishing_battle_embed(
                     "🎣 힘겨루기 중!",
                     f"{message}\n\n초록 칸을 눌러 게이지를 채워라!",
                     make_gauge_bar(self.gauge, self.max_gauge),
-                    f"실수: **{self.fail_count}/3**\n이번 타이밍: **{self.hit_count}/{self.need_hits}**\n남은 시간: **{remaining}초**{effect_text}{gold_text}"
+                    f"실수: **{self.fail_count}/3**\n이번 타이밍: **{self.hit_count}/{self.need_hits}**{effect_text}{gold_text}"
                 ),
                 view=self
             )
+            if not ok:
+                self._ended = True
+                self.stop()
+                return
 
             await asyncio.sleep(move_interval)
             elapsed += move_interval
 
-        if not self.round_active or token != self.round_token:
+        if self._ended or not self.round_active or token != self.round_token:
             return
 
         self.fail_count += 1
@@ -2189,7 +2246,8 @@ class FishBattleView(discord.ui.View):
             await self.fail()
             return
 
-        await self.message.edit(
+        await safe_edit_message(
+            self.message,
             content=None,
             embed=fishing_fail_embed(
                 "💨 타이밍 실패",
@@ -2202,6 +2260,9 @@ class FishBattleView(discord.ui.View):
         await self.start_hit_round()
 
     async def add_gauge(self, multiplier=1):
+        if self._ended:
+            return
+
         self.gauge = min(self.max_gauge, self.gauge + self.gauge_step() * multiplier)
         self.hit_count = 0
         self.need_hits = random.randint(1, 3)
@@ -2210,7 +2271,8 @@ class FishBattleView(discord.ui.View):
             await self.success()
             return
 
-        await self.message.edit(
+        await safe_edit_message(
+            self.message,
             content=None,
             embed=fishing_battle_embed(
                 "✅ 잡아당겼다!",
@@ -2225,6 +2287,10 @@ class FishBattleView(discord.ui.View):
         await self.start_hit_round()
 
     async def success(self):
+        if self._ended:
+            return
+        self._ended = True
+
         caught_fish = []
 
         for fish_name in self.fish_list:
@@ -2234,28 +2300,11 @@ class FishBattleView(discord.ui.View):
         chest_name = roll_fishing_chest(self.user_id)
         save_data()
 
-        lost_rewards = globals().get("LOST_ITEM_REWARDS", {})
-        lost_items = [
-            fish for fish in caught_fish
-            if fish["name"] in lost_rewards
-        ]
+        for item in self.children:
+            item.disabled = True
 
-        if len(lost_items) == 1 and "LostItemReturnView" in globals():
-            lost_item = lost_items[0]
-            view = LostItemReturnView(self.user_id, lost_item)
-
-            embed = fishing_result_embed(caught_fish, self.rod_name, self.bait_name, chest_name)
-            embed.add_field(
-                name="📦 귀중품 발견",
-                value=f"**{lost_item['display_name']}**의 주인을 찾을까?",
-                inline=False
-            )
-
-            await self.message.edit(content=None, embed=embed, view=view)
-            self.stop()
-            return
-
-        await self.message.edit(
+        await safe_edit_message(
+            self.message,
             content=None,
             embed=fishing_result_embed(caught_fish, self.rod_name, self.bait_name, chest_name),
             view=None
@@ -2264,11 +2313,26 @@ class FishBattleView(discord.ui.View):
         self.stop()
 
     async def fail(self):
-        await self.message.edit(
+        if self._ended:
+            return
+        self._ended = True
+
+        self.round_active = False
+        self.round_token += 1
+
+        for item in self.children:
+            item.disabled = True
+
+        await safe_edit_message(
+            self.message,
             content=None,
-            embed=fishing_fail_embed("🐟 물고기 도주", "실수를 너무 많이 해서 물고기가 도망쳤다..."),
+            embed=fishing_fail_embed(
+                "🐟 물고기 도주",
+                "실수를 너무 많이 해서 물고기가 도망쳤다..."
+            ),
             view=None
         )
+
         self.stop()
 
     async def on_timeout(self):
@@ -2289,6 +2353,10 @@ class FishGaugeButton(discord.ui.Button):
 
         if interaction.user.id != view.user_id:
             await interaction.response.send_message("❌ 니 물고기 아님.", ephemeral=True)
+            return
+
+        if getattr(view, "_ended", False):
+            await interaction.response.defer()
             return
 
         if not view.round_active:
@@ -2375,6 +2443,10 @@ class BossFishingButton(discord.ui.Button):
             await interaction.response.send_message("❌ 니 보스 아님.", ephemeral=True)
             return
 
+        if getattr(view, "_ended", False):
+            await interaction.response.defer()
+            return
+
         if self.index != view.target_index:
             await interaction.response.defer()
             await view.fail_boss("잘못된 칸 클릭")
@@ -2409,12 +2481,13 @@ class BossFishingView(discord.ui.View):
         self.target_index = None
         self.failed = False
         self.message = None
+        self._ended = False
 
         for i in range(9):
             self.add_item(BossFishingButton(i))
 
     async def start_round(self):
-        while self.current_hits < self.required_hits and not self.failed:
+        while self.current_hits < self.required_hits and not self.failed and not self._ended:
             self.target_index = random.randint(0, 8)
 
             for item in self.children:
@@ -2425,7 +2498,8 @@ class BossFishingView(discord.ui.View):
             self.children[self.target_index].label = "🟩"
             self.children[self.target_index].style = discord.ButtonStyle.green
 
-            await self.message.edit(
+            ok = await safe_edit_message(
+                self.message,
                 content=None,
                 embed=fishing_battle_embed(
                     f"🐲 보스 출현: {self.boss_name}",
@@ -2435,35 +2509,52 @@ class BossFishingView(discord.ui.View):
                 ),
                 view=self
             )
+            if not ok:
+                self._ended = True
+                self.stop()
+                return
 
             before = self.current_hits
             await asyncio.sleep(3)
+
+            if self._ended or self.failed:
+                return
 
             if self.current_hits == before:
                 await self.fail_boss("시간 초과")
                 return
 
-        if not self.failed:
+        if not self.failed and not self._ended:
             await self.success_boss()
 
     async def fail_boss(self, reason):
+        if self._ended:
+            return
+
+        self._ended = True
         self.failed = True
 
         for item in self.children:
             item.disabled = True
 
-        await self.message.edit(
+        await safe_edit_message(
+            self.message,
             content=None,
             embed=fishing_fail_embed(
                 f"💀 {self.boss_name} 도주",
                 f"사유: **{reason}**\n진행도: **{self.current_hits}/{self.required_hits}**"
             ),
-            view=self
+            view=None
         )
 
         self.stop()
 
     async def success_boss(self):
+        if self._ended:
+            return
+
+        self._ended = True
+
         fish = make_fish(self.user_id, self.boss_name)
         chest_name = roll_fishing_chest(self.user_id)
         save_data()
@@ -2471,13 +2562,17 @@ class BossFishingView(discord.ui.View):
         for item in self.children:
             item.disabled = True
 
-        await self.message.edit(
+        await safe_edit_message(
+            self.message,
             content=None,
             embed=fishing_result_embed([fish], self.rod_name, self.bait_name, chest_name, boss=True),
             view=None
         )
 
         self.stop()
+
+    async def on_timeout(self):
+        await self.fail_boss("시간 초과")
 
 
 # =========================
@@ -2589,7 +2684,7 @@ async def fishing(interaction: discord.Interaction):
 
     view.message = await interaction.original_response()
     asyncio.create_task(view.start_waiting())
-
+    
 # =========================
 # 뽑기 / 상자 선택 설정
 # =========================
