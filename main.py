@@ -2407,6 +2407,9 @@ class FishGaugeButton(discord.ui.Button):
             view=view
         )
 
+await asyncio.sleep(0.5)
+await view.start_hit_round()
+
 
 # =========================
 # 보스 낚시
