@@ -2081,19 +2081,32 @@ class FishBattleView(discord.ui.View):
             self.add_item(FishGaugeButton(i))
 
     def gauge_step(self):
-        rod = ROD_DATA.get(self.rod_name, ROD_DATA["기본 낚싯대"])
-        bait = BAIT_DATA.get(self.bait_name, BAIT_DATA["미끼 없음"])
-
-        base = max(1, self.max_gauge // 10)
-
-        rod_bonus = random.randint(0, int(rod.get("gauge_bonus", 0)))
-
-        bait_bonus = random.randint(
-            0,
-            max(0, int(bait.get("luck", 0)) // 10)
+        rod = ROD_DATA.get(
+            self.rod_name,
+            ROD_DATA["기본 낚싯대"]
         )
 
-    return base + rod_bonus + bait_bonus
+        bait = BAIT_DATA.get(
+            self.bait_name,
+            BAIT_DATA["미끼 없음"]
+        )
+
+        # 물고기 난이도 기반 기본 증가량
+        base = max(1, self.max_gauge // 10)
+
+        # 낚싯대 보정 (랜덤)
+        rod_bonus = random.randint(
+            0,
+            rod.get("gauge_bonus", 0)
+        )
+
+        # 미끼 보정 (랜덤)
+        bait_bonus = random.randint(
+            0,
+            max(0, bait.get("luck", 0) // 10)
+        )
+
+        return base + rod_bonus + bait_bonus
 
     def reset_buttons(self, disabled=True):
         for item in self.children:
