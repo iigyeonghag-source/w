@@ -1213,18 +1213,37 @@ def open_chest_once(user_id, chest_name):
     add_item(user_id, item_name, 1)
     return item_name
 
-def roll_fishing_chest(user_id):
-    """낚시 성공 보상용 상자 드랍. 실패가 쌓이면 확률이 조금씩 오른다."""
+def roll_fishing_chest(user_id, rod_name):
     uid = str(user_id)
-    pity = int(chest_pity.get(uid, 0))
-    chance = min(35, 8 + pity * 2)
 
-    if random.randint(1, 100) > chance:
+    rod = ROD_DATA.get(rod_name, ROD_DATA["기본 낚싯대"])
+
+    # 낚싯대 보정치: 기존 ROD_DATA에 있는 luck 사용
+    rod_bonus = rod.get("luck", 0)
+
+    # 기본 확률
+    base_chance = 8
+
+    # 실패 누적
+    pity = int(chest_pity.get(uid, 0))
+
+    # 실패할 때마다 랜덤으로 확률 증가
+    pity_bonus = 0
+    for _ in range(pity):
+        pity_bonus += random.uniform(0.5, 2.5)
+
+    # 낚싯대 luck 보정
+    rod_chance_bonus = rod_bonus / 20
+
+    chance = min(35, base_chance + pity_bonus + rod_chance_bonus)
+
+    if random.uniform(0, 100) > chance:
         chest_pity[uid] = pity + 1
         save_data()
         return None
 
     chest_pity[uid] = 0
+
     chest_name = random.choices(
         ["낡은 부품 상자", "신비한 부품 상자", "심해의 보물 상자"],
         weights=[75, 22, 3],
@@ -1234,7 +1253,7 @@ def roll_fishing_chest(user_id):
     add_item(user_id, chest_name, 1)
     save_data()
     return chest_name
-
+    
 def item_cost_text(costs):
     if not costs:
         return "없음"
@@ -2279,7 +2298,7 @@ class FishBattleView(discord.ui.View):
             fish = make_fish(self.user_id, fish_name)
             caught_fish.append(fish)
 
-        chest_name = roll_fishing_chest(self.user_id)
+        chest_name = roll_fishing_chest(self.user_id, self.rod_name, self.bait_name)
         save_data()
 
         for item in self.children:
