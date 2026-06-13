@@ -1213,29 +1213,35 @@ def open_chest_once(user_id, chest_name):
     add_item(user_id, item_name, 1)
     return item_name
 
-def roll_fishing_chest(user_id, rod_name):
+def roll_fishing_chest(user_id, rod_name="기본 낚싯대", bait_name="미끼 없음"):
     uid = str(user_id)
 
     rod = ROD_DATA.get(rod_name, ROD_DATA["기본 낚싯대"])
+    bait = BAIT_DATA.get(bait_name, BAIT_DATA["미끼 없음"])
 
-    # 낚싯대 보정치: 기존 ROD_DATA에 있는 luck 사용
-    rod_bonus = rod.get("luck", 0)
-
-    # 기본 확률
-    base_chance = 8
-
-    # 실패 누적
     pity = int(chest_pity.get(uid, 0))
 
-    # 실패할 때마다 랜덤으로 확률 증가
-    pity_bonus = 0
-    for _ in range(pity):
-        pity_bonus += random.uniform(0.5, 2.5)
+    base_gain = random.uniform(6.0, 10.0)
 
-    # 낚싯대 luck 보정
-    rod_chance_bonus = rod_bonus / 20
+    rod_bonus = random.uniform(
+        0,
+        float(rod.get("gauge_bonus", 0))
+    )
 
-    chance = min(35, base_chance + pity_bonus + rod_chance_bonus)
+    bait_bonus = random.uniform(
+        0,
+        float(bait.get("luck", 0)) / 20
+    )
+
+    pity_bonus = sum(
+        random.uniform(0.5, 2.0)
+        for _ in range(pity)
+    )
+
+    chance = min(
+        60.0,
+        base_gain + rod_bonus + bait_bonus + pity_bonus
+    )
 
     if random.uniform(0, 100) > chance:
         chest_pity[uid] = pity + 1
@@ -2078,14 +2084,16 @@ class FishBattleView(discord.ui.View):
         rod = ROD_DATA.get(self.rod_name, ROD_DATA["기본 낚싯대"])
         bait = BAIT_DATA.get(self.bait_name, BAIT_DATA["미끼 없음"])
 
-        rod_bonus = rod.get("gauge_bonus", 0)
-        bait_luck = bait.get("luck", 0)
+        base = max(1, self.max_gauge // 10)
 
-        base = random.randint(6, 12)
-        rod_add = random.randint(0, max(0, rod_bonus // 2))
-        bait_add = random.randint(0, max(0, bait_luck // 25))
+        rod_bonus = random.randint(0, int(rod.get("gauge_bonus", 0)))
 
-        return base + rod_add + bait_add
+        bait_bonus = random.randint(
+            0,
+            max(0, int(bait.get("luck", 0)) // 10)
+        )
+
+    return base + rod_bonus + bait_bonus
 
     def reset_buttons(self, disabled=True):
         for item in self.children:
