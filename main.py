@@ -1211,26 +1211,6 @@ def open_chest_once(user_id, chest_name):
     return item_name
 
 
-def roll_fishing_chest(user_id):
-    """낚시 성공 보상용 상자 드랍. 실패가 쌓이면 확률이 조금씩 오른다."""
-    uid = str(user_id)
-    pity = int(chest_pity.get(uid, 0))
-    chance = min(35, 8 + pity * 2)
-
-    if random.randint(1, 100) > chance:
-        chest_pity[uid] = pity + 1
-        save_data()
-        return None
-
-    chest_pity[uid] = 0
-    chest_name = random.choices(
-        ["낡은 부품 상자", "신비한 부품 상자", "심해의 보물 상자"],
-        weights=[75, 22, 3],
-        k=1
-    )[0]
-    add_item(user_id, chest_name, 1)
-    return chest_name
-
 
 def item_cost_text(costs):
     if not costs:
@@ -1456,19 +1436,18 @@ if not globals().get("_FISH_CHANCE_HALVED", False):
 # 저장용 데이터
 # =========================
 
-fish_tanks = globals().get("fish_tanks", {})
-fish_dex = globals().get("fish_dex", {})
-item_bags = globals().get("item_bags", {})
-chest_pity = globals().get("chest_pity", {})
-gacha_pity = globals().get("gacha_pity", {})
+fish_tanks = NormalizedDict(globals().get("fish_tanks", {}))
+fish_dex = NormalizedDict(globals().get("fish_dex", {}))
+item_bags = NormalizedDict(globals().get("item_bags", {}))
+chest_pity = NormalizedDict(globals().get("chest_pity", {}))
+gacha_pity = NormalizedDict(globals().get("gacha_pity", {}))
 
-owned_rods = globals().get("owned_rods", {})
-equipped_rods = globals().get("equipped_rods", {})
-owned_baits = globals().get("owned_baits", {})
-equipped_baits = globals().get("equipped_baits", {})
+owned_rods = NormalizedDict(globals().get("owned_rods", {}))
+equipped_rods = NormalizedDict(globals().get("equipped_rods", {}))
+owned_baits = NormalizedDict(globals().get("owned_baits", {}))
+equipped_baits = NormalizedDict(globals().get("equipped_baits", {}))
 
-fishing_cooldowns = {}
-FISHING_COOLDOWN = timedelta(seconds=10)
+fishing_cooldowns = globals().get("fishing_cooldowns", {})
 
 fish_market = globals().get("fish_market", {})
 last_market_update = globals().get("last_market_update", None)
@@ -1538,21 +1517,21 @@ def get_market_text(fish_name):
 # =========================
 
 def get_tank(user_id):
+    uid = str(user_id)
     changed = False
 
-    if user_id not in fish_tanks or not isinstance(fish_tanks[user_id], list):
-        fish_tanks[user_id] = []
+    if uid not in fish_tanks or not isinstance(fish_tanks[uid], list):
+        fish_tanks[uid] = []
         changed = True
 
-
-    if user_id not in fish_dex:
-        fish_dex[user_id] = set()
+    if uid not in fish_dex or not isinstance(fish_dex[uid], set):
+        fish_dex[uid] = set()
         changed = True
 
     if changed:
         save_data()
 
-    return changed
+    return fish_tanks[uid]
 
 
 def fish_price(fish_name, kg):
@@ -1614,8 +1593,11 @@ def roll_fish_trait():
     return weighted_trait_choice(bad_traits)
 
 def make_fish(user_id, fish_name):
-    fish_data = FISH_DATA[fish_name]
+    uid = str(user_id)
 
+    get_tank(uid)
+
+    fish_data = FISH_DATA[fish_name]
     trait_name = roll_fish_trait()
 
     kg = random.uniform(
@@ -1645,11 +1627,11 @@ def make_fish(user_id, fish_name):
         "price": price
     }
 
-    fish_tanks[user_id].append(fish)
-    fish_dex[user_id].add(fish_name)
+    fish_tanks[uid].append(fish)
+    fish_dex[uid].add(fish_name)
+    save_data()
 
     return fish
-
 
 def get_fishing_gear(user_id):
     changed = False
