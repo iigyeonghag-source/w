@@ -9,6 +9,9 @@ from dotenv import load_dotenv
 from io import BytesIO
 from datetime import datetime, timedelta
 from discord.errors import NotFound
+from datetime import timedelta
+
+FISHING_COOLDOWN = timedelta(seconds=10)
 
 load_dotenv()
 
