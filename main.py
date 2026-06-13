@@ -1235,30 +1235,6 @@ def roll_fishing_chest(user_id):
     save_data()
     return chest_name
 
-
-def item_cost_text(costs):
-    if not costs:
-        return "없음"
-    return ", ".join(f"{name} x{count}" for name, count in costs.items())
-
-    pity = int(chest_pity.get(uid, 0))
-    chance = min(35, 8 + pity * 2)
-
-    if random.randint(1, 100) > chance:
-        chest_pity[uid] = pity + 1
-        save_data()
-        return None
-
-    chest_pity[uid] = 0
-    chest_name = random.choices(
-        ["낡은 부품 상자", "신비한 부품 상자", "심해의 보물 상자"],
-        weights=[75, 22, 3],
-        k=1
-    )[0]
-    add_item(user_id, chest_name, 1)
-    return chest_name
-
-
 def item_cost_text(costs):
     if not costs:
         return "없음"
