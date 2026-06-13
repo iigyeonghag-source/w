@@ -1213,6 +1213,27 @@ def open_chest_once(user_id, chest_name):
     add_item(user_id, item_name, 1)
     return item_name
 
+        def roll_fishing_chest(user_id):
+    """낚시 성공 보상용 상자 드랍. 실패가 쌓이면 확률이 조금씩 오른다."""
+    uid = str(user_id)
+    pity = int(chest_pity.get(uid, 0))
+    chance = min(35, 8 + pity * 2)
+
+    if random.randint(1, 100) > chance:
+        chest_pity[uid] = pity + 1
+        save_data()
+        return None
+
+    chest_pity[uid] = 0
+    chest_name = random.choices(
+        ["낡은 부품 상자", "신비한 부품 상자", "심해의 보물 상자"],
+        weights=[75, 22, 3],
+        k=1
+    )[0]
+
+    add_item(user_id, chest_name, 1)
+    save_data()
+    return chest_name
 
 
 def item_cost_text(costs):
