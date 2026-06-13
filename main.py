@@ -1213,7 +1213,7 @@ def open_chest_once(user_id, chest_name):
     add_item(user_id, item_name, 1)
     return item_name
 
-        def roll_fishing_chest(user_id):
+def roll_fishing_chest(user_id):
     """낚시 성공 보상용 상자 드랍. 실패가 쌓이면 확률이 조금씩 오른다."""
     uid = str(user_id)
     pity = int(chest_pity.get(uid, 0))
